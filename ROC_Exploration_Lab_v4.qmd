@@ -5,23 +5,19 @@ Date: November 28, 2025
 format: html
 ---
 
-
 ## Introduction
 
 This notebook implements functions to help the reader interactively explore the properties of Receiver Operating Characteristic (ROC) curves which are used extensively in Machine Learning to evaluate the performance of binary classifiers and in medical applications to evaluate the effectiveness of tests. The reader is expected to have some minimal knowledge of ROC curves such as that that can be obtained from the Wikipedia Article [Receiver operating characteristic](https://en.wikipedia.org/wiki/Receiver_operating_characteristic).
 
+The notebook is divided into two parts. Part 1 focuses on exploring a single ROC curve that is created by selecting distributions for positive values (signal is present) and negative values (signal no present, only noise) and selecting a threshold to distinguish between the tw. Signal and noise distributions can be Normal, Beta, Cauchy or Student's t distribution.
+
+Part 2 provides an atlas of ROC curves that contains one example with *default* settings from each of the sixteen possible combinations of distributions, and one example with *stress* parameters for each of the sixteen combinations.
 
 Synthetic ROC generator with flexible signal/noise distributions
 Below is a modular R implementation that:
 
-* Supports Normal, Beta, Student’s t, and Cauchy for both signal and noise, with sensible defaults.
-* Provides a function per distribution and a factory to pick by name.
-* Plots overlaid densities and histograms for selected signal/noise, with a vertical default threshold.
-* Allows independent choice of signal and noise distributions.
-* Outputs classes and probabilities in a data frame ready for pROC (Class and .pred_1).
 
-
-## ROC Simulation
+## PART 1: ROC Simulation
 
 ### Required Packages
 
@@ -188,9 +184,6 @@ plot_threshold_performance <- function(df, decision_col = ".pred_1") {
 ```
 
 
-
-
-
 ### User Input
 Define your simulation parameters and choose distributions for signal and noise.
 
@@ -338,67 +331,22 @@ plot_roc_with_point(df, threshold = threshold, predictor_col = ".pred_1")
 
 ## PART 2: ROC Atlas with Baseline, Stress, and Prevalence
 
-### What the Code Does
-
-- Simulates datasets for each signal–noise pair using the specified parameters and thresholds.  
-- Validates each dataset to ensure both classes are present.  
-- Computes ROC curves manually by sweeping thresholds across the observed score range.  
-- Calculates AUC (area under the curve) for each scenario.  
-- Plots overlays with clear line styles:  
-  - **Blue solid** = baseline  
-  - **Red dashed** = stress  
-  - **Green dot-dash** = prevalence-shift  
-- AUC values are displayed in the subtitle or legend.  
-
-
-### Guidelines for Use
-
-- Customize the parameter lists to test different distribution shapes or stress conditions.  
-- Adjust **n_pos/n_neg** to explore prevalence effects on PPV/NPV.  
-- Use `build_overlay_plot()` for individual plots, or run the atlas panels (`panel1–panel4`) to see all 16 combinations.  
-- The code is modular: extend it with new distributions or prevalence scenarios by adding entries to the parameter lists and adjusting `internal_threshold()`.  
-- Remember: ROC geometry is invariant to prevalence, but predictive values (PPV, NPV) will change — use prevalence-shift overlays to visualize this distinction.  
-
-
-
-
-This script builds a grid of plots showing Receiver Operating Characteristic (ROC) curves for different combinations of signal and noise distributions. Each plot overlays three scenarios:
+This section builds an atlas of Receiver Operating Characteristic (ROC) curves designed to show some typical and then interesting behavior. This script builds a grid of ROC plots showing  curves for different combinations of signal and noise distributions. Each plot overlays three scenarios:
 
 1. **Baseline** (balanced prevalence, default parameters)  
 2. **Stress-test** (heavier tails / wider spread parameters)  
 3. **Prevalence-shift** (imbalanced dataset, e.g. 20% positives)
 
----
-
-## User Parameters (customize here)
-
-You can adjust the following before running the atlas:
-
-- n_pos, n_neg: number of positive and negative samples  
-  - Controls prevalence ratio (e.g. `1000/1000` for balanced, `200/800` for 20% positives).  
-- signal_list / noise_list: baseline distribution parameters  
-  - Options include *normal*, *beta*, *student_t*, *cauchy*.  
-- signal_stress / noise_stress: stress-test parameters  
-  - Heavier tails, larger variance, shifted means.  
-- 
-
-**Example:** To make a single plot for `*Normal signal vs Beta noise*, call:
-`build_overlay_plot("normal", "beta")`
-
-
-
-
-
+Descriptions of the default parameters for the Baseline distributions are given in the table in Appendix A. Descriptions for the stress distributions are given in Appendix B.
 
 
 
 ```{r}
-
 #| message: FALSE
 #| warning: FALSE
 #| code-fold: TRUE
 #| code-summary: "Show the code"
-
+#
 # --- Validation helper ---
 validate_dataset <- function(df, score_col = "score", class_col = "Class") {
   if (!score_col %in% names(df) || !class_col %in% names(df)) return(NULL)
@@ -573,7 +521,7 @@ panel1; panel2; panel3; panel4 # prints out plots and grid layout tables
 ```
 
 
-## Appendix 1: Parameter Settings
+## Appendix A: Parameter Settings
 
 #### Default parameters for 16 signal–noise combinations
 
@@ -640,7 +588,7 @@ gt_tbl
 ```
 
 
-## Appendix 2: Stress-test Simulation Parameters
+## Appendix B: Stress-test Simulation Parameters
 
 * Stress-testing:
  * Increase noise scale (e.g., cauchy scale = 1.5–2) to inflate tails and FPR.
@@ -687,5 +635,21 @@ gt_tbl2 <- gt(tbl_data2) %>%
 gt_tbl2
 
 ```
+
+
+## Appendix C: User Parameters (customize here)
+
+You can adjust the following before running the atlas:
+
+* n_pos, n_neg: number of positive and negative samples. These control the prevalence ratio (e.g. `1000/1000` for balanced, `200/800` for 20% positives).  
+* signal_list / noise_list: baseline distribution parameters. Options include *normal*, *beta*, *student_t*, *cauchy*.  
+* signal_stress / noise_stress: stress-test parameters:  Heavier tails, larger variance, shifted means.  
+* Use `build_overlay_plot()` for individual plots, or run the atlas panels (`panel1–panel4`) to see all 16 combinations.
+* The code is modular: extend it with new distributions or prevalence scenarios by adding entries to the parameter lists and adjusting `internal_threshold()`.  
+* Remember: ROC geometry is invariant to prevalence, but predictive values (PPV, NPV) will change — use prevalence-shift overlays to visualize this distinction.  
+* **Example:** To make a single plot for `*Normal signal vs Beta noise*, call: `build_overlay_plot("normal", "beta")`
+
+
+
 
 

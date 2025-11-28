@@ -10,18 +10,15 @@ format: html
 
 This notebook implements functions to help the reader interactively explore the properties of Receiver Operating Characteristic (ROC) curves which are used extensively in Machine Learning to evaluate the performance of binary classifiers and in medical applications to evaluate the effectiveness of tests. The reader is expected to have some minimal knowledge of ROC curves such as that that can be obtained from the Wikipedia Article [Receiver operating characteristic](https://en.wikipedia.org/wiki/Receiver_operating_characteristic).
 
+The notebook is divided into two parts. Part 1 focuses on exploring a single ROC curve that is created by selecting distributions for positive values (signal is present) and negative values (signal no present, only noise) and selecting a threshold to distinguish between the tw. Signal and noise distributions can be Normal, Beta, Cauchy or Student's t distribution.
+
+Part 2 provides an atlas of ROC curves that contains one example with *default* settings from each of the sixteen possible combinations of distributions, and one example with *stress* parameters for each of the sixteen combinations.
 
 Synthetic ROC generator with flexible signal/noise distributions
 Below is a modular R implementation that:
 
-* Supports Normal, Beta, Student’s t, and Cauchy for both signal and noise, with sensible defaults.
-* Provides a function per distribution and a factory to pick by name.
-* Plots overlaid densities and histograms for selected signal/noise, with a vertical default threshold.
-* Allows independent choice of signal and noise distributions.
-* Outputs classes and probabilities in a data frame ready for pROC (Class and .pred_1).
 
-
-## ROC Simulation
+## PART 1: ROC Simulation
 
 ### Required Packages
 
@@ -40,9 +37,6 @@ library(patchwork)
 library(zoo)
 library(gt)
 ```
-
-
-## PART 1
 
 ### Helper Functions
 

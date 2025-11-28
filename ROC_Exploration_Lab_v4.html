@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Joseph B. Rickert">
+
+<title>ROC Exploration Lab</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="ROC_Exploration_Lab_v4_files/libs/clipboard/clipboard.min.js"></script>
+<script src="ROC_Exploration_Lab_v4_files/libs/quarto-html/quarto.js"></script>
+<script src="ROC_Exploration_Lab_v4_files/libs/quarto-html/popper.min.js"></script>
+<script src="ROC_Exploration_Lab_v4_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="ROC_Exploration_Lab_v4_files/libs/quarto-html/anchor.min.js"></script>
+<link href="ROC_Exploration_Lab_v4_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="ROC_Exploration_Lab_v4_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="ROC_Exploration_Lab_v4_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="ROC_Exploration_Lab_v4_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="ROC_Exploration_Lab_v4_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">ROC Exploration Lab</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Joseph B. Rickert </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This notebook implements functions to help the reader interactively explore the properties of Receiver Operating Characteristic (ROC) curves which are used extensively in Machine Learning to evaluate the performance of binary classifiers and in medical applications to evaluate the effectiveness of tests. The reader is expected to have some minimal knowledge of ROC curves such as that that can be obtained from the Wikipedia Article <a href="https://en.wikipedia.org/wiki/Receiver_operating_characteristic">Receiver operating characteristic</a>.</p>
+<p>The notebook is divided into two parts. Part 1 focuses on exploring a single ROC curve that is created by selecting distributions for positive values (signal is present) and negative values (signal no present, only noise) and selecting a threshold to distinguish between the tw. Signal and noise distributions can be Normal, Beta, Cauchy or Student’s t distribution.</p>
+<p>Part 2 provides an atlas of ROC curves that contains one example with <em>default</em> settings from each of the sixteen possible combinations of distributions, and one example with <em>stress</em> parameters for each of the sixteen combinations.</p>
+<p>Synthetic ROC generator with flexible signal/noise distributions Below is a modular R implementation that:</p>
+</section>
+<section id="part-1-roc-simulation" class="level2">
+<h2 class="anchored" data-anchor-id="part-1-roc-simulation">PART 1: ROC Simulation</h2>
+<section id="required-packages" class="level3">
+<h3 class="anchored" data-anchor-id="required-packages">Required Packages</h3>
+<div class="cell">
+<details>
+<summary>Show the packages required</summary>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tibble)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(pROC) <span class="co"># for Part  ROC curve</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidymodels)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(zoo)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gt)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="part-1" class="level2">
+<h2 class="anchored" data-anchor-id="part-1">PART 1</h2>
+<section id="helper-functions" class="level3">
+<h3 class="anchored" data-anchor-id="helper-functions">Helper Functions</h3>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Distribution constructors ---</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>dist_normal <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">mean =</span> <span class="dv">0</span>, <span class="at">sd =</span> <span class="dv">1</span>) {</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name=</span><span class="st">"normal"</span>, <span class="at">r=</span><span class="cf">function</span>(n) <span class="fu">rnorm</span>(n, mean, sd),</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">d=</span><span class="cf">function</span>(x) <span class="fu">dnorm</span>(x, mean, sd),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">default_threshold=</span>mean)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>dist_beta <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">shape1=</span><span class="dv">2</span>, <span class="at">shape2=</span><span class="dv">5</span>) {</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name=</span><span class="st">"beta"</span>, <span class="at">r=</span><span class="cf">function</span>(n) <span class="fu">rbeta</span>(n, shape1, shape2),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">d=</span><span class="cf">function</span>(x) <span class="fu">dbeta</span>(x, shape1, shape2),</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">default_threshold=</span>shape1<span class="sc">/</span>(shape1<span class="sc">+</span>shape2))</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>dist_student_t <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">df=</span><span class="dv">5</span>, <span class="at">loc=</span><span class="dv">0</span>, <span class="at">scale=</span><span class="dv">1</span>) {</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name=</span><span class="st">"student_t"</span>, <span class="at">r=</span><span class="cf">function</span>(n) loc<span class="sc">+</span>scale<span class="sc">*</span><span class="fu">rt</span>(n,df),</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>       <span class="at">d=</span><span class="cf">function</span>(x) <span class="fu">dt</span>((x<span class="sc">-</span>loc)<span class="sc">/</span>scale,df)<span class="sc">/</span>scale,</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">default_threshold=</span>loc)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>dist_cauchy <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">loc=</span><span class="dv">0</span>, <span class="at">scale=</span><span class="dv">1</span>) {</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name=</span><span class="st">"cauchy"</span>, <span class="at">r=</span><span class="cf">function</span>(n) <span class="fu">rcauchy</span>(n, loc, scale),</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>       <span class="at">d=</span><span class="cf">function</span>(x) <span class="fu">dcauchy</span>(x, loc, scale),</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>       <span class="at">default_threshold=</span>loc)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Factory ---</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>get_distribution <span class="ot">&lt;-</span> <span class="cf">function</span>(name, ...) {</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">switch</span>(name,</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">normal    =</span> <span class="fu">dist_normal</span>(...),</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">beta      =</span> <span class="fu">dist_beta</span>(...),</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">student_t =</span> <span class="fu">dist_student_t</span>(...),</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">cauchy    =</span> <span class="fu">dist_cauchy</span>(...)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="co"># --- ROC utilities ---</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>compute_roc_table <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">predictor_col =</span> <span class="st">".pred_1"</span>) {</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>  roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="at">response =</span> df<span class="sc">$</span>Class,</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>                 <span class="at">predictor =</span> df[[predictor_col]],</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>                 <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"2"</span>,<span class="st">"1"</span>),</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>                 <span class="at">direction =</span> <span class="st">"&lt;"</span>)</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>  coords_df <span class="ot">&lt;-</span> <span class="fu">coords</span>(roc_obj, <span class="st">"all"</span>,</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>                      <span class="at">ret =</span> <span class="fu">c</span>(<span class="st">"threshold"</span>,<span class="st">"sensitivity"</span>,<span class="st">"specificity"</span>),</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>                      <span class="at">transpose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>    <span class="at">threshold =</span> coords_df<span class="sc">$</span>threshold,</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="at">TPR =</span> coords_df<span class="sc">$</span>sensitivity,</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    <span class="at">FPR =</span> <span class="dv">1</span> <span class="sc">-</span> coords_df<span class="sc">$</span>specificity</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="co"># Sweep thresholds empirically on a chosen decision variable</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="co"># Computes TPR/FPR for every unique threshold in the variable's domain,</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="co"># using rule: predict positive if var &gt;= threshold</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>sweep_thresholds <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">decision_col =</span> <span class="st">".pred_1"</span>) {</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>  x <span class="ot">&lt;-</span> df[[decision_col]]</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>  y <span class="ot">&lt;-</span> df<span class="sc">$</span>Class</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>  thr <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(x), <span class="at">decreasing =</span> <span class="cn">TRUE</span>)  <span class="co"># thresholds to test</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>  pos <span class="ot">&lt;-</span> (y <span class="sc">==</span> <span class="st">"1"</span>)</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>  neg <span class="ot">&lt;-</span> (y <span class="sc">==</span> <span class="st">"2"</span>)</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map_dfr</span>(thr, <span class="cf">function</span>(t) {</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>    pred_pos <span class="ot">&lt;-</span> (x <span class="sc">&gt;=</span> t)</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>    TP <span class="ot">&lt;-</span> <span class="fu">sum</span>(pred_pos <span class="sc">&amp;</span> pos)</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>    FP <span class="ot">&lt;-</span> <span class="fu">sum</span>(pred_pos <span class="sc">&amp;</span> neg)</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>    FN <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="sc">!</span>pred_pos <span class="sc">&amp;</span> pos)</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>    TN <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="sc">!</span>pred_pos <span class="sc">&amp;</span> neg)</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    TPR <span class="ot">&lt;-</span> <span class="fu">ifelse</span>((TP<span class="sc">+</span>FN) <span class="sc">&gt;</span> <span class="dv">0</span>, TP<span class="sc">/</span>(TP<span class="sc">+</span>FN), <span class="cn">NA_real_</span>)</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    FPR <span class="ot">&lt;-</span> <span class="fu">ifelse</span>((FP<span class="sc">+</span>TN) <span class="sc">&gt;</span> <span class="dv">0</span>, FP<span class="sc">/</span>(FP<span class="sc">+</span>TN), <span class="cn">NA_real_</span>)</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(<span class="at">threshold =</span> t, <span class="at">TPR =</span> TPR, <span class="at">FPR =</span> FPR)</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>plot_densities <span class="ot">&lt;-</span> <span class="cf">function</span>(df, signal, noise, threshold, <span class="at">bins =</span> <span class="dv">50</span>, <span class="at">xlim =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">10</span>, <span class="dv">10</span>)) {</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>  df_trunc <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span> <span class="fu">filter</span>(score <span class="sc">&gt;=</span> xlim[<span class="dv">1</span>], score <span class="sc">&lt;=</span> xlim[<span class="dv">2</span>])</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(df_trunc, <span class="fu">aes</span>(<span class="at">x =</span> score)) <span class="sc">+</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_histogram</span>(<span class="at">data =</span> <span class="fu">filter</span>(df_trunc, Class <span class="sc">==</span> <span class="st">"1"</span>),</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">after_stat</span>(density), <span class="at">fill =</span> <span class="st">"Signal"</span>),</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>                   <span class="at">bins =</span> bins, <span class="at">alpha =</span> <span class="fl">0.3</span>, <span class="at">position =</span> <span class="st">"identity"</span>, <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_histogram</span>(<span class="at">data =</span> <span class="fu">filter</span>(df_trunc, Class <span class="sc">==</span> <span class="st">"2"</span>),</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">after_stat</span>(density), <span class="at">fill =</span> <span class="st">"Noise"</span>),</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>                   <span class="at">bins =</span> bins, <span class="at">alpha =</span> <span class="fl">0.3</span>, <span class="at">position =</span> <span class="st">"identity"</span>, <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_density</span>(<span class="at">data =</span> <span class="fu">filter</span>(df_trunc, Class <span class="sc">==</span> <span class="st">"1"</span>),</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">aes</span>(<span class="at">y =</span> ..density.., <span class="at">color =</span> <span class="st">"Signal"</span>), <span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_density</span>(<span class="at">data =</span> <span class="fu">filter</span>(df_trunc, Class <span class="sc">==</span> <span class="st">"2"</span>),</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">aes</span>(<span class="at">y =</span> ..density.., <span class="at">color =</span> <span class="st">"Noise"</span>), <span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> threshold, <span class="at">linetype =</span> <span class="st">"dashed"</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Signal =</span> <span class="st">"#1f78b4"</span>, <span class="at">Noise =</span> <span class="st">"#33a02c"</span>)) <span class="sc">+</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Signal =</span> <span class="st">"#1f78b4"</span>, <span class="at">Noise =</span> <span class="st">"#33a02c"</span>)) <span class="sc">+</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">sprintf</span>(<span class="st">"Truncated Density Plot: Signal (%s) vs Noise (%s)"</span>, signal<span class="sc">$</span>name, noise<span class="sc">$</span>name),</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Score"</span>, <span class="at">y =</span> <span class="st">"Density"</span>, <span class="at">color =</span> <span class="st">"Curve"</span>, <span class="at">fill =</span> <span class="st">"Histogram"</span>) <span class="sc">+</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coord_cartesian</span>(<span class="at">xlim =</span> xlim) <span class="sc">+</span></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>) <span class="sc">+</span></span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">12</span>, <span class="at">face =</span> <span class="st">"bold"</span>))</span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="do">## Plot ROC Curve</span></span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>plot_roc_with_point <span class="ot">&lt;-</span> <span class="cf">function</span>(df, threshold, <span class="at">predictor_col =</span> <span class="st">".pred_1"</span>) {</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>  roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="at">response =</span> df<span class="sc">$</span>Class,</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>                 <span class="at">predictor =</span> df[[predictor_col]],</span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>                 <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"2"</span>,<span class="st">"1"</span>),</span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>                 <span class="at">direction =</span> <span class="st">"&lt;"</span>)</span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(roc_obj, <span class="at">col=</span><span class="st">"#1f78b4"</span>, <span class="at">lwd=</span><span class="dv">2</span>, <span class="at">main=</span><span class="st">"ROC Curve"</span>)</span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>  coords_pt <span class="ot">&lt;-</span> <span class="fu">coords</span>(roc_obj, <span class="at">x =</span> threshold, <span class="at">input=</span><span class="st">"threshold"</span>,</span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>                      <span class="at">ret=</span><span class="fu">c</span>(<span class="st">"specificity"</span>,<span class="st">"sensitivity"</span>))</span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>  <span class="fu">points</span>(<span class="dv">1</span> <span class="sc">-</span> coords_pt[<span class="st">"specificity"</span>], coords_pt[<span class="st">"sensitivity"</span>],</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>         <span class="at">col=</span><span class="st">"red"</span>, <span class="at">pch=</span><span class="dv">19</span>, <span class="at">cex=</span><span class="fl">1.2</span>)</span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>  <span class="fu">text</span>(<span class="dv">1</span> <span class="sc">-</span> coords_pt[<span class="st">"specificity"</span>], coords_pt[<span class="st">"sensitivity"</span>],</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>       <span class="at">labels =</span> <span class="fu">paste0</span>(<span class="st">"t="</span>, threshold), <span class="at">pos=</span><span class="dv">4</span>, <span class="at">col=</span><span class="st">"red"</span>)</span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>plot_threshold_performance <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">decision_col =</span> <span class="st">".pred_1"</span>) {</span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Build perf_df inside the function</span></span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>  perf_df <span class="ot">&lt;-</span> <span class="fu">sweep_thresholds</span>(df, <span class="at">decision_col =</span> decision_col)</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(perf_df <span class="sc">%&gt;%</span> tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="fu">c</span>(TPR, FPR),</span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>                                         <span class="at">names_to =</span> <span class="st">"Metric"</span>, <span class="at">values_to =</span> <span class="st">"Value"</span>),</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>         <span class="fu">aes</span>(<span class="at">x =</span> threshold, <span class="at">y =</span> Value, <span class="at">color =</span> Metric)) <span class="sc">+</span></span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>    <span class="fu">facet_wrap</span>(<span class="sc">~</span>Metric, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">TPR =</span> <span class="st">"#1f78b4"</span>, <span class="at">FPR =</span> <span class="st">"#d62728"</span>)) <span class="sc">+</span></span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">sprintf</span>(<span class="st">"Threshold sweep on %s: TPR and FPR vs threshold"</span>, decision_col),</span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Threshold"</span>, <span class="at">y =</span> <span class="st">"Value"</span>) <span class="sc">+</span></span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>) <span class="sc">+</span></span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">12</span>, <span class="at">face =</span> <span class="st">"bold"</span>))</span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="user-input" class="level3">
+<h3 class="anchored" data-anchor-id="user-input">User Input</h3>
+<p>Define your simulation parameters and choose distributions for signal and noise.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># User input</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>n_pos <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>n_neg <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>seed  <span class="ot">&lt;-</span> <span class="dv">123</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># To run a Normal / Cauchy simulation set the paraneters as follows:</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>signal_name <span class="ot">&lt;-</span> <span class="st">"normal"</span>   <span class="co"># options: "normal", "beta", "student_t", "cauchy"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>noise_name  <span class="ot">&lt;-</span> <span class="st">"cauchy"</span>  <span class="co"># options: "normal", "beta", "student_t", "cauchy"</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Normal- Cauchy</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>signal_params <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="fl">1.5</span>, <span class="at">sd =</span> <span class="dv">1</span>) <span class="co"># Moderate separation from noise at 0 with unit </span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>noise_params <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">loc =</span> <span class="dv">0</span>, <span class="at">scale =</span> <span class="dv">1</span>) <span class="co"># Centered at 0 with standard scale captures heavy-tail false positives; useful stress-test against Gaussian signal.</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">#Neutral baseline; adjust as needed to reflect clinical class imbalance (this affects posterior probabilities but not ROC shape).</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>threshold <span class="ot">&lt;-</span> <span class="fl">1.5</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co"># To run a Normal / Normulation use these parameters:</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>   <span class="co"># signal_name &lt;- "normal"   </span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>   <span class="co"># noise_name  &lt;- "normal"</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>   <span class="co"># signal_params &lt;- list(mean = 2, sd = 1)       # normal defaults</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>   <span class="co"># noise_params &lt;- list(mean = 0, sd = 2) </span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>   <span class="co"># threshold &lt;- 1.5</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="simulate-data" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-data">Simulate Data</h3>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>simulate_data <span class="ot">&lt;-</span> <span class="cf">function</span>(n_pos, n_neg, signal_name, noise_name,</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                          signal_params, noise_params,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                          <span class="at">threshold =</span> <span class="cn">NULL</span>, <span class="at">seed =</span> <span class="cn">NULL</span>, <span class="at">prevalence =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(seed)) <span class="fu">set.seed</span>(seed)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If threshold is set, shift the signal distribution mean/location</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(threshold)) {</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (signal_name <span class="sc">==</span> <span class="st">"normal"</span>) signal_params<span class="sc">$</span>mean <span class="ot">&lt;-</span> threshold</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (signal_name <span class="sc">==</span> <span class="st">"student_t"</span>) signal_params<span class="sc">$</span>loc <span class="ot">&lt;-</span> threshold</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (signal_name <span class="sc">==</span> <span class="st">"cauchy"</span>) signal_params<span class="sc">$</span>loc <span class="ot">&lt;-</span> threshold</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (signal_name <span class="sc">==</span> <span class="st">"beta"</span>) {</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>      <span class="co"># For beta, interpret threshold as mean = alpha/(alpha+beta)</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>      target_mean <span class="ot">&lt;-</span> threshold</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>      total <span class="ot">&lt;-</span> signal_params<span class="sc">$</span>shape1 <span class="sc">+</span> signal_params<span class="sc">$</span>shape2</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>      signal_params<span class="sc">$</span>shape1 <span class="ot">&lt;-</span> target_mean <span class="sc">*</span> total</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>      signal_params<span class="sc">$</span>shape2 <span class="ot">&lt;-</span> (<span class="dv">1</span> <span class="sc">-</span> target_mean) <span class="sc">*</span> total</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Build distributions</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  signal <span class="ot">&lt;-</span> <span class="fu">do.call</span>(get_distribution, <span class="fu">c</span>(<span class="fu">list</span>(signal_name), signal_params))</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  noise  <span class="ot">&lt;-</span> <span class="fu">do.call</span>(get_distribution, <span class="fu">c</span>(<span class="fu">list</span>(noise_name),  noise_params))</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  s_pos <span class="ot">&lt;-</span> signal<span class="sc">$</span><span class="fu">r</span>(n_pos)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  s_neg <span class="ot">&lt;-</span> noise<span class="sc">$</span><span class="fu">r</span>(n_neg)</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">score =</span> <span class="fu">c</span>(s_pos, s_neg),</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">Class =</span> <span class="fu">factor</span>(<span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">"1"</span>, n_pos), <span class="fu">rep</span>(<span class="st">"2"</span>, n_neg)), <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"2"</span>,<span class="st">"1"</span>))</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(prevalence)) prevalence <span class="ot">&lt;-</span> n_pos <span class="sc">/</span> (n_pos <span class="sc">+</span> n_neg)</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  f1 <span class="ot">&lt;-</span> signal<span class="sc">$</span><span class="fu">d</span>(df<span class="sc">$</span>score)</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>  f0 <span class="ot">&lt;-</span> noise<span class="sc">$</span><span class="fu">d</span>(df<span class="sc">$</span>score)</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>  denom <span class="ot">&lt;-</span> prevalence<span class="sc">*</span>f1 <span class="sc">+</span> (<span class="dv">1</span><span class="sc">-</span>prevalence)<span class="sc">*</span>f0</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">.pred_1 =</span> <span class="fu">ifelse</span>(denom <span class="sc">&gt;</span> <span class="dv">0</span>, prevalence<span class="sc">*</span>f1<span class="sc">/</span>denom, <span class="dv">0</span>),</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>           <span class="at">threshold =</span> threshold,</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>           <span class="at">signal_name =</span> signal<span class="sc">$</span>name,</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>           <span class="at">noise_name  =</span> noise<span class="sc">$</span>name)</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>  df</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="run-the-simulation" class="level3">
+<h3 class="anchored" data-anchor-id="run-the-simulation">Run the Simulation</h3>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Simulate Data ---</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">simulate_data</span>(n_pos, n_neg,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                    signal_name, noise_name,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                    signal_params, noise_params,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                    <span class="at">threshold =</span> threshold, <span class="at">seed =</span> seed)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Density Plot ---</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>signal <span class="ot">&lt;-</span> <span class="fu">do.call</span>(get_distribution, <span class="fu">c</span>(<span class="fu">list</span>(signal_name), signal_params))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>noise  <span class="ot">&lt;-</span> <span class="fu">do.call</span>(get_distribution, <span class="fu">c</span>(<span class="fu">list</span>(noise_name), noise_params))</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_densities</span>(df, signal, noise, threshold)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid" width="672"></p>
+</div>
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">#head(perf_df)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="columns">
+<div class="column" style="width:45%;">
+<div class="cell">
+<details>
+<summary>Plot threshold performance</summary>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot threshold performance</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_threshold_performance</span>(df, <span class="at">decision_col =</span> <span class="st">".pred_1"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</div><div class="column" style="width:10%;">
+
+</div><div class="column" style="width:45%;">
+<div class="cell">
+<details>
+<summary>Plot ROC Curve</summary>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot ROC curve with chosen threshold point</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_roc_with_point</span>(df, <span class="at">threshold =</span> threshold, <span class="at">predictor_col =</span> <span class="st">".pred_1"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="part-2-roc-atlas-with-baseline-stress-and-prevalence" class="level2">
+<h2 class="anchored" data-anchor-id="part-2-roc-atlas-with-baseline-stress-and-prevalence">PART 2: ROC Atlas with Baseline, Stress, and Prevalence</h2>
+<p>This section builds an atlas of Receiver Operating Characteristic (ROC) curves designed to show some typical and then interesting behavior. This script builds a grid of ROC plots showing curves for different combinations of signal and noise distributions. Each plot overlays three scenarios:</p>
+<ol type="1">
+<li><strong>Baseline</strong> (balanced prevalence, default parameters)<br>
+</li>
+<li><strong>Stress-test</strong> (heavier tails / wider spread parameters)<br>
+</li>
+<li><strong>Prevalence-shift</strong> (imbalanced dataset, e.g.&nbsp;20% positives)</li>
+</ol>
+<p>Descriptions of the default parameters for the Baseline distributions are given in the table in Appendix A. Descriptions for the stress distributions are given in Appendix B.</p>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Validation helper ---</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>validate_dataset <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">score_col =</span> <span class="st">"score"</span>, <span class="at">class_col =</span> <span class="st">"Class"</span>) {</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>score_col <span class="sc">%in%</span> <span class="fu">names</span>(df) <span class="sc">||</span> <span class="sc">!</span>class_col <span class="sc">%in%</span> <span class="fu">names</span>(df)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> df[<span class="sc">!</span><span class="fu">is.na</span>(df[[score_col]]) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(df[[class_col]]), , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nrow</span>(df) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.numeric</span>(df[[score_col]])) {</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    df[[score_col]] <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">as.numeric</span>(df[[score_col]]))</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">any</span>(<span class="fu">is.na</span>(df[[score_col]]))) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  df[[class_col]] <span class="ot">&lt;-</span> <span class="fu">as.character</span>(df[[class_col]])</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  labs <span class="ot">&lt;-</span> <span class="fu">unique</span>(df[[class_col]])</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(labs) <span class="sc">!=</span> <span class="dv">2</span>) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  tab <span class="ot">&lt;-</span> <span class="fu">table</span>(df[[class_col]])</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">any</span>(tab <span class="sc">==</span> <span class="dv">0</span>)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  df</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Positive class detection ---</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>detect_positive_label <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">score_col =</span> <span class="st">"score"</span>, <span class="at">class_col =</span> <span class="st">"Class"</span>) {</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  m_by_class <span class="ot">&lt;-</span> <span class="fu">tapply</span>(df[[score_col]], df[[class_col]], mean, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  pos_label <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">which.max</span>(m_by_class))</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  neg_label <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">names</span>(m_by_class), pos_label)</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">pos_label =</span> pos_label, <span class="at">neg_label =</span> neg_label)</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Manual ROC sweep ---</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>manual_roc <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">score_col =</span> <span class="st">"score"</span>, <span class="at">class_col =</span> <span class="st">"Class"</span>, <span class="at">n_grid =</span> <span class="dv">200</span>) {</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> <span class="fu">validate_dataset</span>(df, score_col, class_col)</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(df)) <span class="fu">return</span>(<span class="fu">list</span>(<span class="at">roc_df =</span> <span class="fu">tibble</span>(<span class="at">FPR =</span> <span class="fu">numeric</span>(<span class="dv">0</span>), <span class="at">TPR =</span> <span class="fu">numeric</span>(<span class="dv">0</span>)), <span class="at">auc =</span> <span class="cn">NA_real_</span>))</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  labs <span class="ot">&lt;-</span> <span class="fu">detect_positive_label</span>(df, score_col, class_col)</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  scores <span class="ot">&lt;-</span> df[[score_col]]</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  thresholds <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(scores), <span class="fu">max</span>(scores), <span class="at">length.out =</span> n_grid)</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>  out <span class="ot">&lt;-</span> <span class="fu">map_dfr</span>(thresholds, <span class="cf">function</span>(t) {</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    pred_pos <span class="ot">&lt;-</span> (scores <span class="sc">&gt;=</span> t)</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    TP <span class="ot">&lt;-</span> <span class="fu">sum</span>(pred_pos <span class="sc">&amp;</span> (df[[class_col]] <span class="sc">==</span> labs<span class="sc">$</span>pos_label))</span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    FP <span class="ot">&lt;-</span> <span class="fu">sum</span>(pred_pos <span class="sc">&amp;</span> (df[[class_col]] <span class="sc">==</span> labs<span class="sc">$</span>neg_label))</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    FN <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="sc">!</span>pred_pos <span class="sc">&amp;</span> (df[[class_col]] <span class="sc">==</span> labs<span class="sc">$</span>pos_label))</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    TN <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="sc">!</span>pred_pos <span class="sc">&amp;</span> (df[[class_col]] <span class="sc">==</span> labs<span class="sc">$</span>neg_label))</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> ((TP<span class="sc">+</span>FN) <span class="sc">&gt;</span> <span class="dv">0</span> <span class="sc">&amp;&amp;</span> (FP<span class="sc">+</span>TN) <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="fu">tibble</span>(<span class="at">TPR =</span> TP<span class="sc">/</span>(TP<span class="sc">+</span>FN), <span class="at">FPR =</span> FP<span class="sc">/</span>(FP<span class="sc">+</span>TN)) <span class="cf">else</span> <span class="cn">NULL</span></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nrow</span>(out) <span class="sc">==</span> <span class="dv">0</span>) out <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">TPR =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">1</span>), <span class="at">FPR =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">1</span>))</span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> out <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">tibble</span>(<span class="at">TPR=</span><span class="dv">0</span>,<span class="at">FPR=</span><span class="dv">0</span>), out, <span class="fu">tibble</span>(<span class="at">TPR=</span><span class="dv">1</span>,<span class="at">FPR=</span><span class="dv">1</span>)) <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(FPR)</span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>  auc <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">nrow</span>(out) <span class="sc">&gt;</span> <span class="dv">1</span>) <span class="fu">sum</span>(<span class="fu">diff</span>(out<span class="sc">$</span>FPR) <span class="sc">*</span> <span class="fu">rollmean</span>(out<span class="sc">$</span>TPR, <span class="dv">2</span>)) <span class="cf">else</span> <span class="cn">NA_real_</span></span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">roc_df =</span> out, <span class="at">auc =</span> auc)</span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Parameter sets ---</span></span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>signal_list <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>  <span class="at">normal    =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="fl">1.5</span>, <span class="at">sd =</span> <span class="dv">1</span>),</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>  <span class="at">beta      =</span> <span class="fu">list</span>(<span class="at">shape1 =</span> <span class="dv">3</span>, <span class="at">shape2 =</span> <span class="dv">2</span>),</span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>  <span class="at">student_t =</span> <span class="fu">list</span>(<span class="at">df =</span> <span class="dv">5</span>, <span class="at">loc =</span> <span class="fl">1.5</span>, <span class="at">scale =</span> <span class="dv">1</span>),</span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>  <span class="at">cauchy    =</span> <span class="fu">list</span>(<span class="at">loc =</span> <span class="fl">1.5</span>, <span class="at">scale =</span> <span class="dv">1</span>)</span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a>noise_list <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a>  <span class="at">normal    =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">0</span>, <span class="at">sd =</span> <span class="dv">1</span>),</span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a>  <span class="at">beta      =</span> <span class="fu">list</span>(<span class="at">shape1 =</span> <span class="dv">2</span>, <span class="at">shape2 =</span> <span class="dv">3</span>),</span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a>  <span class="at">student_t =</span> <span class="fu">list</span>(<span class="at">df =</span> <span class="dv">5</span>, <span class="at">loc =</span> <span class="dv">0</span>, <span class="at">scale =</span> <span class="dv">1</span>),</span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a>  <span class="at">cauchy    =</span> <span class="fu">list</span>(<span class="at">loc =</span> <span class="dv">0</span>, <span class="at">scale =</span> <span class="dv">1</span>)</span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a>signal_stress <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a>  <span class="at">normal    =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="fl">1.5</span>, <span class="at">sd =</span> <span class="dv">2</span>),</span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a>  <span class="at">beta      =</span> <span class="fu">list</span>(<span class="at">shape1 =</span> <span class="dv">7</span>, <span class="at">shape2 =</span> <span class="dv">3</span>),</span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a>  <span class="at">student_t =</span> <span class="fu">list</span>(<span class="at">df =</span> <span class="dv">3</span>, <span class="at">loc =</span> <span class="fl">1.5</span>, <span class="at">scale =</span> <span class="dv">2</span>),</span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a>  <span class="at">cauchy    =</span> <span class="fu">list</span>(<span class="at">loc =</span> <span class="fl">1.5</span>, <span class="at">scale =</span> <span class="dv">2</span>)</span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a>noise_stress <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a>  <span class="at">normal    =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">0</span>, <span class="at">sd =</span> <span class="dv">2</span>),</span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a>  <span class="at">beta      =</span> <span class="fu">list</span>(<span class="at">shape1 =</span> <span class="dv">3</span>, <span class="at">shape2 =</span> <span class="dv">7</span>),</span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a>  <span class="at">student_t =</span> <span class="fu">list</span>(<span class="at">df =</span> <span class="dv">3</span>, <span class="at">loc =</span> <span class="dv">0</span>, <span class="at">scale =</span> <span class="dv">2</span>),</span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a>  <span class="at">cauchy    =</span> <span class="fu">list</span>(<span class="at">loc =</span> <span class="dv">0</span>, <span class="at">scale =</span> <span class="dv">2</span>)</span>
+<span id="cb9-72"><a href="#cb9-72" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-73"><a href="#cb9-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-74"><a href="#cb9-74" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Dynamic threshold helper ---</span></span>
+<span id="cb9-75"><a href="#cb9-75" aria-hidden="true" tabindex="-1"></a>beta_mean <span class="ot">&lt;-</span> <span class="cf">function</span>(shape1, shape2) shape1<span class="sc">/</span>(shape1<span class="sc">+</span>shape2)</span>
+<span id="cb9-76"><a href="#cb9-76" aria-hidden="true" tabindex="-1"></a>internal_threshold <span class="ot">&lt;-</span> <span class="cf">function</span>(sig_name, params) {</span>
+<span id="cb9-77"><a href="#cb9-77" aria-hidden="true" tabindex="-1"></a>  <span class="cf">switch</span>(sig_name,</span>
+<span id="cb9-78"><a href="#cb9-78" aria-hidden="true" tabindex="-1"></a>    <span class="at">beta      =</span> <span class="fu">beta_mean</span>(params<span class="sc">$</span>shape1, params<span class="sc">$</span>shape2),</span>
+<span id="cb9-79"><a href="#cb9-79" aria-hidden="true" tabindex="-1"></a>    <span class="at">normal    =</span> params<span class="sc">$</span>mean,</span>
+<span id="cb9-80"><a href="#cb9-80" aria-hidden="true" tabindex="-1"></a>    <span class="at">student_t =</span> params<span class="sc">$</span>loc,</span>
+<span id="cb9-81"><a href="#cb9-81" aria-hidden="true" tabindex="-1"></a>    <span class="at">cauchy    =</span> params<span class="sc">$</span>loc,</span>
+<span id="cb9-82"><a href="#cb9-82" aria-hidden="true" tabindex="-1"></a>    <span class="fl">0.0</span></span>
+<span id="cb9-83"><a href="#cb9-83" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-84"><a href="#cb9-84" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-85"><a href="#cb9-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-86"><a href="#cb9-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-87"><a href="#cb9-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-88"><a href="#cb9-88" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Overlay plot with legend suppressed ---</span></span>
+<span id="cb9-89"><a href="#cb9-89" aria-hidden="true" tabindex="-1"></a>plot_overlay_safe <span class="ot">&lt;-</span> <span class="cf">function</span>(roc_base, roc_stress, roc_prev, title_txt) {</span>
+<span id="cb9-90"><a href="#cb9-90" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add Curve labels</span></span>
+<span id="cb9-91"><a href="#cb9-91" aria-hidden="true" tabindex="-1"></a>  roc_base<span class="sc">$</span>roc_df<span class="sc">$</span>Curve   <span class="ot">&lt;-</span> <span class="st">"Baseline"</span></span>
+<span id="cb9-92"><a href="#cb9-92" aria-hidden="true" tabindex="-1"></a>  roc_stress<span class="sc">$</span>roc_df<span class="sc">$</span>Curve <span class="ot">&lt;-</span> <span class="st">"Stress"</span></span>
+<span id="cb9-93"><a href="#cb9-93" aria-hidden="true" tabindex="-1"></a>  roc_prev<span class="sc">$</span>roc_df<span class="sc">$</span>Curve   <span class="ot">&lt;-</span> <span class="st">"Prevalence"</span></span>
+<span id="cb9-94"><a href="#cb9-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-95"><a href="#cb9-95" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Combine into one data frame</span></span>
+<span id="cb9-96"><a href="#cb9-96" aria-hidden="true" tabindex="-1"></a>  all_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb9-97"><a href="#cb9-97" aria-hidden="true" tabindex="-1"></a>    roc_base<span class="sc">$</span>roc_df,</span>
+<span id="cb9-98"><a href="#cb9-98" aria-hidden="true" tabindex="-1"></a>    roc_stress<span class="sc">$</span>roc_df,</span>
+<span id="cb9-99"><a href="#cb9-99" aria-hidden="true" tabindex="-1"></a>    roc_prev<span class="sc">$</span>roc_df</span>
+<span id="cb9-100"><a href="#cb9-100" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-101"><a href="#cb9-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-102"><a href="#cb9-102" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb9-103"><a href="#cb9-103" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_abline</span>(<span class="at">slope=</span><span class="dv">1</span>, <span class="at">intercept=</span><span class="dv">0</span>, <span class="at">linetype=</span><span class="st">"dotted"</span>, <span class="at">color=</span><span class="st">"gray50"</span>) <span class="sc">+</span></span>
+<span id="cb9-104"><a href="#cb9-104" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="at">data=</span>all_df, <span class="fu">aes</span>(<span class="at">x=</span>FPR, <span class="at">y=</span>TPR, <span class="at">color=</span>Curve, <span class="at">linetype=</span>Curve)) <span class="sc">+</span></span>
+<span id="cb9-105"><a href="#cb9-105" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(</span>
+<span id="cb9-106"><a href="#cb9-106" aria-hidden="true" tabindex="-1"></a>      <span class="at">title=</span>title_txt,</span>
+<span id="cb9-107"><a href="#cb9-107" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span><span class="fu">sprintf</span>(<span class="st">"Baseline AUC=%s | Stress AUC=%s | Prevalence AUC=%s"</span>,</span>
+<span id="cb9-108"><a href="#cb9-108" aria-hidden="true" tabindex="-1"></a>                       <span class="fu">ifelse</span>(<span class="fu">is.na</span>(roc_base<span class="sc">$</span>auc),<span class="st">"NA"</span>,<span class="fu">sprintf</span>(<span class="st">"%.3f"</span>,roc_base<span class="sc">$</span>auc)),</span>
+<span id="cb9-109"><a href="#cb9-109" aria-hidden="true" tabindex="-1"></a>                       <span class="fu">ifelse</span>(<span class="fu">is.na</span>(roc_stress<span class="sc">$</span>auc),<span class="st">"NA"</span>,<span class="fu">sprintf</span>(<span class="st">"%.3f"</span>,roc_stress<span class="sc">$</span>auc)),</span>
+<span id="cb9-110"><a href="#cb9-110" aria-hidden="true" tabindex="-1"></a>                       <span class="fu">ifelse</span>(<span class="fu">is.na</span>(roc_prev<span class="sc">$</span>auc),<span class="st">"NA"</span>,<span class="fu">sprintf</span>(<span class="st">"%.3f"</span>,roc_prev<span class="sc">$</span>auc))),</span>
+<span id="cb9-111"><a href="#cb9-111" aria-hidden="true" tabindex="-1"></a>      <span class="at">x=</span><span class="st">"False Positive Rate"</span>, <span class="at">y=</span><span class="st">"True Positive Rate"</span></span>
+<span id="cb9-112"><a href="#cb9-112" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">+</span></span>
+<span id="cb9-113"><a href="#cb9-113" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_color_manual</span>(<span class="at">values=</span><span class="fu">c</span>(</span>
+<span id="cb9-114"><a href="#cb9-114" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Baseline"</span>   <span class="ot">=</span> <span class="st">"#1f78b4"</span>,</span>
+<span id="cb9-115"><a href="#cb9-115" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Stress"</span>     <span class="ot">=</span> <span class="st">"#e31a1c"</span>,</span>
+<span id="cb9-116"><a href="#cb9-116" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Prevalence"</span> <span class="ot">=</span> <span class="st">"#33a02c"</span></span>
+<span id="cb9-117"><a href="#cb9-117" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">+</span></span>
+<span id="cb9-118"><a href="#cb9-118" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_linetype_manual</span>(<span class="at">values=</span><span class="fu">c</span>(</span>
+<span id="cb9-119"><a href="#cb9-119" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Baseline"</span>   <span class="ot">=</span> <span class="st">"solid"</span>,</span>
+<span id="cb9-120"><a href="#cb9-120" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Stress"</span>     <span class="ot">=</span> <span class="st">"dashed"</span>,</span>
+<span id="cb9-121"><a href="#cb9-121" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Prevalence"</span> <span class="ot">=</span> <span class="st">"dotdash"</span></span>
+<span id="cb9-122"><a href="#cb9-122" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">+</span></span>
+<span id="cb9-123"><a href="#cb9-123" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size=</span><span class="dv">9</span>) <span class="sc">+</span></span>
+<span id="cb9-124"><a href="#cb9-124" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(</span>
+<span id="cb9-125"><a href="#cb9-125" aria-hidden="true" tabindex="-1"></a>      <span class="at">plot.title    =</span> <span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">8</span>, <span class="at">face=</span><span class="st">"bold"</span>),</span>
+<span id="cb9-126"><a href="#cb9-126" aria-hidden="true" tabindex="-1"></a>      <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">7</span>),</span>
+<span id="cb9-127"><a href="#cb9-127" aria-hidden="true" tabindex="-1"></a>      <span class="at">legend.position =</span> <span class="st">"none"</span>   <span class="co"># suppress per-plot legend</span></span>
+<span id="cb9-128"><a href="#cb9-128" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb9-129"><a href="#cb9-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-130"><a href="#cb9-130" aria-hidden="true" tabindex="-1"></a>  p</span>
+<span id="cb9-131"><a href="#cb9-131" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-132"><a href="#cb9-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-133"><a href="#cb9-133" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Build overlay plot for one signal–noise pair ---</span></span>
+<span id="cb9-134"><a href="#cb9-134" aria-hidden="true" tabindex="-1"></a>build_overlay_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(sig, noi) {</span>
+<span id="cb9-135"><a href="#cb9-135" aria-hidden="true" tabindex="-1"></a>  thr_base   <span class="ot">&lt;-</span> <span class="fu">internal_threshold</span>(sig, signal_list[[sig]])</span>
+<span id="cb9-136"><a href="#cb9-136" aria-hidden="true" tabindex="-1"></a>  thr_stress <span class="ot">&lt;-</span> <span class="fu">internal_threshold</span>(sig, signal_stress[[sig]])</span>
+<span id="cb9-137"><a href="#cb9-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-138"><a href="#cb9-138" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Baseline balanced prevalence</span></span>
+<span id="cb9-139"><a href="#cb9-139" aria-hidden="true" tabindex="-1"></a>  df_base <span class="ot">&lt;-</span> <span class="fu">simulate_data</span>(<span class="dv">1000</span>,<span class="dv">1000</span>,sig,noi,signal_list[[sig]],noise_list[[noi]],<span class="at">threshold=</span>thr_base,<span class="at">seed=</span><span class="dv">123</span>)</span>
+<span id="cb9-140"><a href="#cb9-140" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Stress</span></span>
+<span id="cb9-141"><a href="#cb9-141" aria-hidden="true" tabindex="-1"></a>  df_stress <span class="ot">&lt;-</span> <span class="fu">simulate_data</span>(<span class="dv">1000</span>,<span class="dv">1000</span>,sig,noi,signal_stress[[sig]],noise_stress[[noi]],<span class="at">threshold=</span>thr_stress,<span class="at">seed=</span><span class="dv">123</span>)</span>
+<span id="cb9-142"><a href="#cb9-142" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Prevalence imbalance (20% positives, 80% negatives)</span></span>
+<span id="cb9-143"><a href="#cb9-143" aria-hidden="true" tabindex="-1"></a>  df_prev <span class="ot">&lt;-</span> <span class="fu">simulate_data</span>(<span class="dv">200</span>,<span class="dv">800</span>,sig,noi,signal_list[[sig]],noise_list[[noi]],<span class="at">threshold=</span>thr_base,<span class="at">seed=</span><span class="dv">123</span>)</span>
+<span id="cb9-144"><a href="#cb9-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-145"><a href="#cb9-145" aria-hidden="true" tabindex="-1"></a>  roc_base   <span class="ot">&lt;-</span> <span class="fu">manual_roc</span>(df_base,<span class="st">"score"</span>,<span class="st">"Class"</span>)</span>
+<span id="cb9-146"><a href="#cb9-146" aria-hidden="true" tabindex="-1"></a>  roc_stress <span class="ot">&lt;-</span> <span class="fu">manual_roc</span>(df_stress,<span class="st">"score"</span>,<span class="st">"Class"</span>)</span>
+<span id="cb9-147"><a href="#cb9-147" aria-hidden="true" tabindex="-1"></a>  roc_prev   <span class="ot">&lt;-</span> <span class="fu">manual_roc</span>(df_prev,<span class="st">"score"</span>,<span class="st">"Class"</span>)</span>
+<span id="cb9-148"><a href="#cb9-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-149"><a href="#cb9-149" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_overlay_safe</span>(roc_base,roc_stress,roc_prev,<span class="fu">paste</span>(<span class="st">"Signal:"</span>,sig,<span class="st">"| Noise:"</span>,noi))</span>
+<span id="cb9-150"><a href="#cb9-150" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-151"><a href="#cb9-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-152"><a href="#cb9-152" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Build all plots ---</span></span>
+<span id="cb9-153"><a href="#cb9-153" aria-hidden="true" tabindex="-1"></a>pairs <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">sig=</span><span class="fu">names</span>(signal_list), <span class="at">noi=</span><span class="fu">names</span>(noise_list), <span class="at">stringsAsFactors=</span><span class="cn">FALSE</span>)</span>
+<span id="cb9-154"><a href="#cb9-154" aria-hidden="true" tabindex="-1"></a>plots <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">pmap</span>(pairs, build_overlay_plot)</span>
+<span id="cb9-155"><a href="#cb9-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-156"><a href="#cb9-156" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Assemble panels with one shared legend each ---</span></span>
+<span id="cb9-157"><a href="#cb9-157" aria-hidden="true" tabindex="-1"></a>panel1 <span class="ot">&lt;-</span> <span class="fu">wrap_plots</span>(plots[<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>],  <span class="at">ncol=</span><span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb9-158"><a href="#cb9-158" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_layout</span>(<span class="at">guides=</span><span class="st">"collect"</span>) <span class="sc">&amp;</span></span>
+<span id="cb9-159"><a href="#cb9-159" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position=</span><span class="st">"bottom"</span>, <span class="at">legend.title=</span><span class="fu">element_blank</span>())</span>
+<span id="cb9-160"><a href="#cb9-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-161"><a href="#cb9-161" aria-hidden="true" tabindex="-1"></a>panel2 <span class="ot">&lt;-</span> <span class="fu">wrap_plots</span>(plots[<span class="dv">5</span><span class="sc">:</span><span class="dv">8</span>],  <span class="at">ncol=</span><span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb9-162"><a href="#cb9-162" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_layout</span>(<span class="at">guides=</span><span class="st">"collect"</span>) <span class="sc">&amp;</span></span>
+<span id="cb9-163"><a href="#cb9-163" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position=</span><span class="st">"bottom"</span>, <span class="at">legend.title=</span><span class="fu">element_blank</span>())</span>
+<span id="cb9-164"><a href="#cb9-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-165"><a href="#cb9-165" aria-hidden="true" tabindex="-1"></a>panel3 <span class="ot">&lt;-</span> <span class="fu">wrap_plots</span>(plots[<span class="dv">9</span><span class="sc">:</span><span class="dv">12</span>], <span class="at">ncol=</span><span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb9-166"><a href="#cb9-166" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_layout</span>(<span class="at">guides=</span><span class="st">"collect"</span>) <span class="sc">&amp;</span></span>
+<span id="cb9-167"><a href="#cb9-167" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position=</span><span class="st">"bottom"</span>, <span class="at">legend.title=</span><span class="fu">element_blank</span>())</span>
+<span id="cb9-168"><a href="#cb9-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-169"><a href="#cb9-169" aria-hidden="true" tabindex="-1"></a>panel4 <span class="ot">&lt;-</span> <span class="fu">wrap_plots</span>(plots[<span class="dv">13</span><span class="sc">:</span><span class="dv">16</span>],<span class="at">ncol=</span><span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb9-170"><a href="#cb9-170" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_layout</span>(<span class="at">guides=</span><span class="st">"collect"</span>) <span class="sc">&amp;</span></span>
+<span id="cb9-171"><a href="#cb9-171" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position=</span><span class="st">"bottom"</span>, <span class="at">legend.title=</span><span class="fu">element_blank</span>())</span>
+<span id="cb9-172"><a href="#cb9-172" aria-hidden="true" tabindex="-1"></a>panel1; panel2; panel3; panel4 <span class="co"># prints out plots and grid layout tables</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-8-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-8-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="ROC_Exploration_Lab_v4_files/figure-html/unnamed-chunk-8-4.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</section>
+<section id="appendix-a-parameter-settings" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-a-parameter-settings">Appendix A: Parameter Settings</h2>
+<section id="default-parameters-for-16-signalnoise-combinations" class="level4">
+<h4 class="anchored" data-anchor-id="default-parameters-for-16-signalnoise-combinations">Default parameters for 16 signal–noise combinations</h4>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the data frame</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>tbl_data <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Signal distribution</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"normal"</span>,<span class="st">"normal"</span>,<span class="st">"normal"</span>,<span class="st">"normal"</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                            <span class="st">"beta"</span>,<span class="st">"beta"</span>,<span class="st">"beta"</span>,<span class="st">"beta"</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>                            <span class="st">"student_t"</span>,<span class="st">"student_t"</span>,<span class="st">"student_t"</span>,<span class="st">"student_t"</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>                            <span class="st">"cauchy"</span>,<span class="st">"cauchy"</span>,<span class="st">"cauchy"</span>,<span class="st">"cauchy"</span>),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Signal params</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"mean = 1.5, sd = 1"</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"mean = 1.5, sd = 1"</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"mean = 1.5, sd = 1"</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"mean = 1.5, sd = 1"</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"shape1 = 3, shape2 = 2 (mean ≈ 0.60)"</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"shape1 = 3, shape2 = 2 (mean ≈ 0.60)"</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"shape1 = 3, shape2 = 2 (mean ≈ 0.60)"</span>,</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"shape1 = 3, shape2 = 2 (mean ≈ 0.60)"</span>,</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"df = 5, loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"df = 5, loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"df = 5, loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"df = 5, loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"loc = 1.5, scale = 1"</span>,</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"loc = 1.5, scale = 1"</span>),</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Noise distribution</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"normal"</span>,<span class="st">"beta"</span>,<span class="st">"student_t"</span>,<span class="st">"cauchy"</span>,</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>                           <span class="st">"normal"</span>,<span class="st">"beta"</span>,<span class="st">"student_t"</span>,<span class="st">"cauchy"</span>,</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>                           <span class="st">"normal"</span>,<span class="st">"beta"</span>,<span class="st">"student_t"</span>,<span class="st">"cauchy"</span>,</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>                           <span class="st">"normal"</span>,<span class="st">"beta"</span>,<span class="st">"student_t"</span>,<span class="st">"cauchy"</span>),</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Noise params</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"mean = 0, sd = 1"</span>,</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"shape1 = 2, shape2 = 3 (mean ≈ 0.40)"</span>,</span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"df = 5, loc = 0, scale = 1"</span>,</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"loc = 0, scale = 1"</span>,</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"mean = 0, sd = 1"</span>,</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"shape1 = 2, shape2 = 3 (mean ≈ 0.40)"</span>,</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"df = 5, loc = 0, scale = 1"</span>,</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"loc = 0, scale = 1"</span>,</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"mean = 0, sd = 1"</span>,</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"shape1 = 2, shape2 = 3 (mean ≈ 0.40)"</span>,</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"df = 5, loc = 0, scale = 1"</span>,</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"loc = 0, scale = 1"</span>,</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"mean = 0, sd = 1"</span>,</span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"shape1 = 2, shape2 = 3 (mean ≈ 0.40)"</span>,</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"df = 5, loc = 0, scale = 1"</span>,</span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"loc = 0, scale = 1"</span>),</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a><span class="co"># Render the table with gt</span></span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>gt_tbl <span class="ot">&lt;-</span> <span class="fu">gt</span>(tbl_data) <span class="sc">%&gt;%</span></span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_options</span>(</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">table.font.size =</span> <span class="fu">pct</span>(<span class="dv">60</span>)   <span class="co"># scale font size to 60% of default</span></span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>gt_tbl</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+
+<div id="mhbfwqngmh" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#mhbfwqngmh table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#mhbfwqngmh thead, #mhbfwqngmh tbody, #mhbfwqngmh tfoot, #mhbfwqngmh tr, #mhbfwqngmh td, #mhbfwqngmh th {
+  border-style: none;
+}
+
+#mhbfwqngmh p {
+  margin: 0;
+  padding: 0;
+}
+
+#mhbfwqngmh .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 60%;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#mhbfwqngmh .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#mhbfwqngmh .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#mhbfwqngmh .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#mhbfwqngmh .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#mhbfwqngmh .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#mhbfwqngmh .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#mhbfwqngmh .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#mhbfwqngmh .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#mhbfwqngmh .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#mhbfwqngmh .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#mhbfwqngmh .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#mhbfwqngmh .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#mhbfwqngmh .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#mhbfwqngmh .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mhbfwqngmh .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#mhbfwqngmh .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#mhbfwqngmh .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#mhbfwqngmh .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mhbfwqngmh .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#mhbfwqngmh .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mhbfwqngmh .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#mhbfwqngmh .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mhbfwqngmh .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mhbfwqngmh .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mhbfwqngmh .gt_left {
+  text-align: left;
+}
+
+#mhbfwqngmh .gt_center {
+  text-align: center;
+}
+
+#mhbfwqngmh .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#mhbfwqngmh .gt_font_normal {
+  font-weight: normal;
+}
+
+#mhbfwqngmh .gt_font_bold {
+  font-weight: bold;
+}
+
+#mhbfwqngmh .gt_font_italic {
+  font-style: italic;
+}
+
+#mhbfwqngmh .gt_super {
+  font-size: 65%;
+}
+
+#mhbfwqngmh .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#mhbfwqngmh .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#mhbfwqngmh .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#mhbfwqngmh .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#mhbfwqngmh .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#mhbfwqngmh .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#mhbfwqngmh .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#mhbfwqngmh .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#mhbfwqngmh div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Signal.distribution">Signal.distribution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Signal.params">Signal.params</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Noise.distribution">Noise.distribution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Noise.params">Noise.params</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">normal</td>
+<td headers="Signal.params" class="gt_row gt_left">mean = 1.5, sd = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">normal</td>
+<td headers="Noise.params" class="gt_row gt_left">mean = 0, sd = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">normal</td>
+<td headers="Signal.params" class="gt_row gt_left">mean = 1.5, sd = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">beta</td>
+<td headers="Noise.params" class="gt_row gt_left">shape1 = 2, shape2 = 3 (mean ≈ 0.40)</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">normal</td>
+<td headers="Signal.params" class="gt_row gt_left">mean = 1.5, sd = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Noise.params" class="gt_row gt_left">df = 5, loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">normal</td>
+<td headers="Signal.params" class="gt_row gt_left">mean = 1.5, sd = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Noise.params" class="gt_row gt_left">loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">beta</td>
+<td headers="Signal.params" class="gt_row gt_left">shape1 = 3, shape2 = 2 (mean ≈ 0.60)</td>
+<td headers="Noise.distribution" class="gt_row gt_left">normal</td>
+<td headers="Noise.params" class="gt_row gt_left">mean = 0, sd = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">beta</td>
+<td headers="Signal.params" class="gt_row gt_left">shape1 = 3, shape2 = 2 (mean ≈ 0.60)</td>
+<td headers="Noise.distribution" class="gt_row gt_left">beta</td>
+<td headers="Noise.params" class="gt_row gt_left">shape1 = 2, shape2 = 3 (mean ≈ 0.40)</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">beta</td>
+<td headers="Signal.params" class="gt_row gt_left">shape1 = 3, shape2 = 2 (mean ≈ 0.60)</td>
+<td headers="Noise.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Noise.params" class="gt_row gt_left">df = 5, loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">beta</td>
+<td headers="Signal.params" class="gt_row gt_left">shape1 = 3, shape2 = 2 (mean ≈ 0.60)</td>
+<td headers="Noise.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Noise.params" class="gt_row gt_left">loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Signal.params" class="gt_row gt_left">df = 5, loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">normal</td>
+<td headers="Noise.params" class="gt_row gt_left">mean = 0, sd = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Signal.params" class="gt_row gt_left">df = 5, loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">beta</td>
+<td headers="Noise.params" class="gt_row gt_left">shape1 = 2, shape2 = 3 (mean ≈ 0.40)</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Signal.params" class="gt_row gt_left">df = 5, loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Noise.params" class="gt_row gt_left">df = 5, loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Signal.params" class="gt_row gt_left">df = 5, loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Noise.params" class="gt_row gt_left">loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Signal.params" class="gt_row gt_left">loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">normal</td>
+<td headers="Noise.params" class="gt_row gt_left">mean = 0, sd = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Signal.params" class="gt_row gt_left">loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">beta</td>
+<td headers="Noise.params" class="gt_row gt_left">shape1 = 2, shape2 = 3 (mean ≈ 0.40)</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Signal.params" class="gt_row gt_left">loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">student_t</td>
+<td headers="Noise.params" class="gt_row gt_left">df = 5, loc = 0, scale = 1</td></tr>
+    <tr><td headers="Signal.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Signal.params" class="gt_row gt_left">loc = 1.5, scale = 1</td>
+<td headers="Noise.distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Noise.params" class="gt_row gt_left">loc = 0, scale = 1</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="appendix-b-stress-test-simulation-parameters" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-b-stress-test-simulation-parameters">Appendix B: Stress-test Simulation Parameters</h2>
+<ul>
+<li>Stress-testing:</li>
+<li>Increase noise scale (e.g., cauchy scale = 1.5–2) to inflate tails and FPR.</li>
+<li>Increase signal spread (sd/scale = 1.5–2) to reduce separability and flatten ROC.</li>
+<li>For beta, consider signal mean ≈ 0.7 vs noise mean ≈ 0.3 by using shape pairs like (7,3) vs (3,7) to widen separation.</li>
+</ul>
+<div class="cell">
+<details>
+<summary>Show the code</summary>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the data frame</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>tbl_data2 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">Distribution =</span> <span class="fu">c</span>(<span class="st">"normal"</span>, <span class="st">"beta"</span>, <span class="st">"student_t"</span>, <span class="st">"cauchy"</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Baseline defaults</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mean = 1.5, sd = 1"</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"shape1 = 3, shape2 = 2 (mean ≈ 0.60)"</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"df = 5, loc = 1.5, scale = 1"</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"loc = 1.5, scale = 1"</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Stress-test ranges</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mean ∈ [0.5, 2.5]; sd ∈ [1.5, 2]"</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"(7,3) → mean ≈ 0.70; (3,7) → mean ≈ 0.30"</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"df ∈ [2,10]; loc ∈ [0.5, 2.5]; scale ∈ [1.5, 2]"</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">"loc ∈ [0.5, 2.5]; scale ∈ [1.5, 2]"</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">Notes =</span> <span class="fu">c</span>(</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Lower mean reduces separation; larger sd increases overlap and flattens ROC"</span>,</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Adjusting shape parameters shifts mean; wider separation improves ROC"</span>,</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Lower df increases heavy tails; larger scale increases overlap"</span>,</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Heavy tails inflate FPR; larger scale exaggerates tail effects"</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Render with gt</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>gt_tbl2 <span class="ot">&lt;-</span> <span class="fu">gt</span>(tbl_data2) <span class="sc">%&gt;%</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_options</span>(</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">table.font.size =</span> <span class="fu">pct</span>(<span class="dv">60</span>)   <span class="co"># scale font size to 60% of default</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>gt_tbl2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+
+<div id="fkjqgwlsqh" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#fkjqgwlsqh table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#fkjqgwlsqh thead, #fkjqgwlsqh tbody, #fkjqgwlsqh tfoot, #fkjqgwlsqh tr, #fkjqgwlsqh td, #fkjqgwlsqh th {
+  border-style: none;
+}
+
+#fkjqgwlsqh p {
+  margin: 0;
+  padding: 0;
+}
+
+#fkjqgwlsqh .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 60%;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#fkjqgwlsqh .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#fkjqgwlsqh .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#fkjqgwlsqh .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#fkjqgwlsqh .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#fkjqgwlsqh .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#fkjqgwlsqh .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#fkjqgwlsqh .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#fkjqgwlsqh .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#fkjqgwlsqh .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#fkjqgwlsqh .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#fkjqgwlsqh .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#fkjqgwlsqh .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#fkjqgwlsqh .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#fkjqgwlsqh .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fkjqgwlsqh .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#fkjqgwlsqh .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#fkjqgwlsqh .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#fkjqgwlsqh .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fkjqgwlsqh .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#fkjqgwlsqh .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fkjqgwlsqh .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#fkjqgwlsqh .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fkjqgwlsqh .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#fkjqgwlsqh .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fkjqgwlsqh .gt_left {
+  text-align: left;
+}
+
+#fkjqgwlsqh .gt_center {
+  text-align: center;
+}
+
+#fkjqgwlsqh .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#fkjqgwlsqh .gt_font_normal {
+  font-weight: normal;
+}
+
+#fkjqgwlsqh .gt_font_bold {
+  font-weight: bold;
+}
+
+#fkjqgwlsqh .gt_font_italic {
+  font-style: italic;
+}
+
+#fkjqgwlsqh .gt_super {
+  font-size: 65%;
+}
+
+#fkjqgwlsqh .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#fkjqgwlsqh .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#fkjqgwlsqh .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#fkjqgwlsqh .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#fkjqgwlsqh .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#fkjqgwlsqh .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#fkjqgwlsqh .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#fkjqgwlsqh .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#fkjqgwlsqh div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Distribution">Distribution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Baseline.defaults">Baseline.defaults</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Stress.test.ranges">Stress.test.ranges</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Notes">Notes</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="Distribution" class="gt_row gt_left">normal</td>
+<td headers="Baseline.defaults" class="gt_row gt_left">mean = 1.5, sd = 1</td>
+<td headers="Stress.test.ranges" class="gt_row gt_left">mean ∈ [0.5, 2.5]; sd ∈ [1.5, 2]</td>
+<td headers="Notes" class="gt_row gt_left">Lower mean reduces separation; larger sd increases overlap and flattens ROC</td></tr>
+    <tr><td headers="Distribution" class="gt_row gt_left">beta</td>
+<td headers="Baseline.defaults" class="gt_row gt_left">shape1 = 3, shape2 = 2 (mean ≈ 0.60)</td>
+<td headers="Stress.test.ranges" class="gt_row gt_left">(7,3) → mean ≈ 0.70; (3,7) → mean ≈ 0.30</td>
+<td headers="Notes" class="gt_row gt_left">Adjusting shape parameters shifts mean; wider separation improves ROC</td></tr>
+    <tr><td headers="Distribution" class="gt_row gt_left">student_t</td>
+<td headers="Baseline.defaults" class="gt_row gt_left">df = 5, loc = 1.5, scale = 1</td>
+<td headers="Stress.test.ranges" class="gt_row gt_left">df ∈ [2,10]; loc ∈ [0.5, 2.5]; scale ∈ [1.5, 2]</td>
+<td headers="Notes" class="gt_row gt_left">Lower df increases heavy tails; larger scale increases overlap</td></tr>
+    <tr><td headers="Distribution" class="gt_row gt_left">cauchy</td>
+<td headers="Baseline.defaults" class="gt_row gt_left">loc = 1.5, scale = 1</td>
+<td headers="Stress.test.ranges" class="gt_row gt_left">loc ∈ [0.5, 2.5]; scale ∈ [1.5, 2]</td>
+<td headers="Notes" class="gt_row gt_left">Heavy tails inflate FPR; larger scale exaggerates tail effects</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="appendix-c-user-parameters-customize-here" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-c-user-parameters-customize-here">Appendix C: User Parameters (customize here)</h2>
+<p>You can adjust the following before running the atlas:</p>
+<ul>
+<li>n_pos, n_neg: number of positive and negative samples. These control the prevalence ratio (e.g.&nbsp;<code>1000/1000</code> for balanced, <code>200/800</code> for 20% positives).<br>
+</li>
+<li>signal_list / noise_list: baseline distribution parameters. Options include <em>normal</em>, <em>beta</em>, <em>student_t</em>, <em>cauchy</em>.<br>
+</li>
+<li>signal_stress / noise_stress: stress-test parameters: Heavier tails, larger variance, shifted means.<br>
+</li>
+<li>Use <code>build_overlay_plot()</code> for individual plots, or run the atlas panels (<code>panel1–panel4</code>) to see all 16 combinations.</li>
+<li>The code is modular: extend it with new distributions or prevalence scenarios by adding entries to the parameter lists and adjusting <code>internal_threshold()</code>.<br>
+</li>
+<li>Remember: ROC geometry is invariant to prevalence, but predictive values (PPV, NPV) will change — use prevalence-shift overlays to visualize this distinction.<br>
+</li>
+<li><strong>Example:</strong> To make a single plot for <code>*Normal signal vs Beta noise*, call:</code>build_overlay_plot(“normal”, “beta”)`</li>
+</ul>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

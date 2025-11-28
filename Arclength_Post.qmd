@@ -1,0 +1,1316 @@
+---
+title: "Arclength Post"
+subtitle: "experimantal version"
+author: Joseph Rickert
+date: November 22, 2025
+format: html
+---
+
+This post makes the case for using arclength as a complementary measure to AUC.
+
+### 1. Load the Required Packages
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show the packages required"
+library(tidymodels) # For modeling and evaluation
+library(dplyr)    # For data manipulation
+library(ggplot2)  # For plotting
+library(MASS) # for Pima.tr
+library(mlbench) # for data
+library(broom)
+library(pROC)  # For ROC curve analysis
+tidymodels_prefer()
+
+```
+
+
+
+
+### Some suitable data sets from R packages
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+# Load a sample dataset (e.g., `two_class_dat` from `modeldata`)
+data(two_class_dat, package = "modeldata")
+two_class_dat2 <- two_class_dat %>%  mutate(Class = recode(Class,
+                           "Class1" = "1",
+                           "Class2" = "2"))
+
+data(Pima.tr, package = "MASS")
+Pima.tr2 <- Pima.tr %>% mutate(
+                              Class = type,
+                              Class = recode(Class,
+                              "Yes" = "2",
+                              "No" = "1")) %>%
+                        select(c(bmi,bp,Class))
+
+data(aSAH, package = "pROC")
+aSAH2 <- aSAH %>% mutate(
+                              Class = outcome,
+                              Class = recode(Class,
+                              "Good" = "1",
+                              "Poor" = "2")) %>%
+                        select(c(s100b,ndka,Class))
+
+```
+
+
+
+### Select the Data Set and Split the Data
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+# Set a seed for reproducibility
+set.seed(123)
+
+# Select a data set
+
+#df<- two_class_dat2 # try FPC = 1, FNC = 10
+#df <- Pima.tr2 # try FPC = 10 , FNC = 1
+df <- aSAH2 #try FPC = 1, FNC = 1
+#head(df)
+
+# Split the data into training and testing sets
+data_split <- initial_split(df, prop = 0.75, strata = Class)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+```
+
+
+### Set up the tidymodels workflows for three models: logistic regression, SVM, and decision tree
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| output: false
+#| code-summary: "Show Code"
+# Define the models
+
+# 1. Logistic Regression
+log_reg_spec <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+# 2. Support Vector Machine (SVM)
+svm_spec <- svm_linear() %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+# 3. Decision Tree
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# Create workflows for each model
+log_reg_wf <- workflow() %>%
+  add_model(log_reg_spec) %>%
+  add_formula(Class ~ .)
+
+svm_wf <- workflow() %>%
+  add_model(svm_spec) %>%
+  add_formula(Class ~ .)
+
+tree_wf <- workflow() %>%
+  add_model(tree_spec) %>%
+  add_formula(Class ~ .)
+
+# Fit the models to the training data
+log_reg_fit <- fit(log_reg_wf, data = train_data)
+svm_fit <- fit(svm_wf, data = train_data)
+tree_fit <- fit(tree_wf, data = train_data)
+
+# Collect predictions for each model on the test data
+log_reg_preds <- predict(log_reg_fit, new_data = test_data, type = "prob") %>%
+  bind_cols(test_data %>% select(Class)) %>%
+  mutate(model = "Logistic Regression")
+
+svm_preds <- predict(svm_fit, new_data = test_data, type = "prob") %>%
+  bind_cols(test_data %>% select(Class)) %>%
+  mutate(model = "SVM")
+
+tree_preds <- predict(tree_fit, new_data = test_data, type = "prob") %>%
+  bind_cols(test_data %>% select(Class)) %>%
+  mutate(model = "Decision Tree")
+```
+
+### Fit the models and collect predictions
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+
+# Compute AUCs and relabel models with AUC values
+auc_tree <- roc_auc(tree_preds, truth = Class, .pred_1)$.estimate
+auc_svm <- roc_auc(svm_preds, truth = Class, .pred_1)$.estimate
+auc_log_reg <- roc_auc(log_reg_preds, truth = Class, .pred_1)$.estimate
+
+# Update model labels to include AUC
+log_reg_preds <- log_reg_preds %>%
+  mutate(model = paste0("Logistic Regression (AUC = ", round(auc_log_reg, 3), ")"))
+
+svm_preds <- svm_preds %>%
+  mutate(model = paste0("SVM (AUC = ", round(auc_svm, 3), ")"))
+
+tree_preds <- tree_preds %>%
+  mutate(model = paste0("Decision Tree (AUC = ", round(auc_tree, 3), ")"))
+
+# Combine predictions with updated labels
+all_preds <- bind_rows(log_reg_preds, svm_preds, tree_preds)
+
+
+
+```
+
+### Plot the ROC Curves
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+# Generate and plot the ROC curves
+ all_preds %>%
+   group_by(model) %>%
+  roc_curve(truth = Class, .pred_1) %>%
+  autoplot() +
+  labs(
+    title = "ROC Curves for Multiple Classifiers",
+    color = "Model"
+  ) 
+
+
+```
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+
+# Make a copy of all_preds with cleaned model names
+all_preds_2 <- all_preds %>%
+    mutate(model_AUC = model,
+              model= sub(" \\(AUC.*$", "", model_AUC))
+
+
+# Compute ROC data for each model
+roc_data <- all_preds_2 %>%
+  group_by(model) %>%
+  roc_curve(truth = Class, .pred_1)
+
+# Compute AUC for each model
+auc_data <- all_preds_2 %>%
+  group_by(model) %>%
+  roc_auc(truth = Class, .pred_1)
+
+# Inspect actual model names
+#print(unique(roc_data$model))
+
+# Build legend labels with AUC
+legend_labels <- paste0(auc_data$model,
+                        " (AUC = ", sprintf("%.3f", auc_data$.estimate), ")")
+
+# IMPORTANT: match colors to the actual values in your data
+# Replace the strings below with the exact output from unique(roc_data$model)
+color_values <- c(
+  "Logistic Regression" = "#1b9e77",
+  "SVM"                 = "#7570b3",
+  "Decision Tree"       = "#d95f02"
+)
+
+
+# Ensure model is a factor with levels matching auc_data$model
+roc_data <- roc_data %>%
+  mutate(model = factor(model, levels = auc_data$model))
+
+# Plot raw step-function ROC curves
+ggplot(roc_data, aes(x = 1 - specificity, y = sensitivity, color = model)) +
+  geom_path(size = 1.4) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  coord_fixed(ratio = 1, xlim = c(0,1), ylim = c(0,1), expand = FALSE) +
+  labs(title = "ROC Curves for Multiple Classifiers",
+       x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  #theme_classic() +
+  theme(
+    legend.position = c(0.65, 0.25),
+    legend.text = element_text(size = 9, lineheight = 1.1),
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+```
+
+### Compute and Plot Smoothed ROC Curves with AUC and Arc Length
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+
+df <- all_preds
+trapz <- function(x, y) {
+  sum((y[-1] + y[-length(y)]) / 2 * diff(x))
+}
+
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),   # control first, positive second
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all", ret = c("specificity","sensitivity"), transpose = FALSE)
+  FPR <- 1 - rc$specificity
+  TPR <- rc$sensitivity
+  
+  FPR <- c(0, FPR, 1)
+  TPR <- c(0, TPR, 1)
+  ord <- order(FPR, TPR)
+  FPR <- FPR[ord]
+  TPR <- cummax(TPR[ord])   # enforce monotonicity
+  
+  tibble(FPR = FPR, TPR = TPR)
+}
+
+smooth_roc <- function(FPR, TPR, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR) %>% arrange(FPR) %>% distinct(FPR, .keep_all = TRUE)
+  mono_fun <- splinefun(x = df$FPR, y = df$TPR, method = "monoH.FC")
+  x <- seq(0, 1, length.out = n)
+  y <- pmin(pmax(mono_fun(x), 0), 1)
+  
+  auc <- trapz(x, y)
+  dy <- mono_fun(x, deriv = 1)
+  arc <- trapz(x, sqrt(1 + dy^2))
+  
+  tibble(FPR = x, TPR = y, auc = auc, arc = arc)
+}
+
+# Normalize model names
+ df <- df %>%
+  mutate(model_norm = sub(" \\(.*$", "", model))
+
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    sr <- smooth_roc(dr$FPR, dr$TPR, n = 400)
+    #sr %>% mutate(model_norm = unique(.x$model_norm))
+  }) %>%
+  ungroup()
+
+metrics <- smooth_results %>%
+  group_by(model_norm) %>%
+  summarise(AUC = unique(auc), Arc = unique(arc), .groups = "drop")
+
+legend_labels <- setNames(
+  paste0(metrics$model_norm, "\nAUC = ", sprintf("%.3f", metrics$AUC),
+         "\nArc = ", sprintf("%.3f", metrics$Arc)),
+  metrics$model_norm
+)
+
+color_values <- setNames(
+  c( "#d95f02", "#1b9e77","#7570b3"),
+  unique(metrics$model_norm)
+)
+
+ggplot(smooth_results, aes(x = FPR, y = TPR, color = model_norm)) +
+  geom_line(linewidth = 1.4) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  coord_fixed(ratio = 1, xlim = c(0,1), ylim = c(0,1), expand = FALSE) +  # square plot
+  labs(title = "Smoothed ROC curves by model",
+       x = "False positive rate (FPR)",
+       y = "True positive rate (TPR)",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  #theme_minimal(base_size = 16) +
+  theme(
+    legend.position.inside = c(0.65, 0.25),   # inside plot, under diagonal
+    legend.text = element_text(size = 9, lineheight = 1.1),
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+```
+
+### Parital AUC and Arc Length (FPR ≤ 0.5)
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| code-fold: TRUE
+#| code-summary: "Show Code"
+legend_labels <- setNames(
+  paste0(metrics$model_norm, "\npAUC (≤0.5) = ", sprintf("%.3f", metrics$pAUC),
+         "\nArc (≤0.5) = ", sprintf("%.3f", metrics$ArcHalf)),
+  metrics$model_norm
+)
+
+
+color_values <- setNames(
+  c( "#d95f02", "#1b9e77","#7570b3"),
+  unique(metrics$model_norm)
+)
+
+
+
+ggplot(smooth_results, aes(x = FPR, y = TPR, color = model_norm)) +
+  geom_line(linewidth = 1) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  coord_fixed(ratio = 1, xlim = c(0,1), ylim = c(0,1), expand = FALSE) +
+  labs(title = "Smoothed Partial ROC Curves (FPR ≤ 0.5)",
+       x = "False positive rate (FPR)",
+       y = "True positive rate (TPR)",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+ # theme_classic() +
+  theme(
+    legend.position = c(0.65, 0.25),
+    legend.text = element_text(size = 9, lineheight = 1.1),
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+```
+
+
+### Table Comparing Arclength with AUC 
+
+| Aspect                        | AUC (Area Under Curve)                                                                 | Arc Length (ROC Curve Length)                                                                 |
+|-------------------------------|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| **Definition**                | Integral of TPR over FPR: \(\int_0^1 f(x)\,dx\)                                         | Integral of curve length: \(\int_0^1 \sqrt{1+(f'(x))^2}\,dx\)                                  |
+| **Probabilistic meaning**     | Probability that a randomly chosen positive is ranked above a randomly chosen negative | Probability that TPR ≤ y given FPR ≤ x (joint distribution along ROC trajectory)               |
+| **Bounds**                    | 0.5 (random) to 1.0 (perfect)                                                          | \(\sqrt{2} \approx 1.414\) (diagonal) to 2.0 (perfect staircase ROC)                           |
+| **Interpretability**          | Widely used, intuitive for clinicians; benchmarks exist (e.g., >0.9 = excellent)        | Linear measure, easier to visualize by eye; highlights curve geometry and trajectory           |
+| **Sensitivity to curve shape**| Less sensitive — curves with different shapes can yield similar AUC                     | More sensitive — captures slope changes, curvature, and smoothness differences                 |
+| **Partial evaluation**        | Partial AUC requires normalization; less visually obvious                               | Partial arc length directly shows region of interest (e.g., FPR ≤ 0.5)                         |
+| **Noise robustness**          | Relatively robust; integrates over curve                                                | More sensitive to noise or jaggedness; small oscillations inflate length                       |
+| **Clinical adoption**         | Standard metric with established thresholds                                             | Novel metric; not yet widely adopted, requires new benchmarks                                  |
+| **Use cases**                 | Ranking accuracy, overall discrimination power                                          | Diagnostic trajectory, geometric comparison, highlighting regional performance differences     |
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Add FPR column
+roc_data <- roc_data %>%
+  mutate(FPR = 1 - specificity)
+
+# 1) Plot TPR vs threshold for all models
+ggplot(roc_data, aes(x = .threshold, y = sensitivity, color = model)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 1.5) +
+  labs(title = "TPR vs Threshold",
+       x = "Threshold",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+# 2) Plot FPR vs threshold for all models
+ggplot(roc_data, aes(x = .threshold, y = FPR, color = model)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 1.5) +
+  labs(title = "FPR vs Threshold",
+       x = "Threshold",
+       y = "False Positive Rate (FPR)",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+```
+
+### Smoothed threshold plots
+
+```{r}
+library(pROC)
+library(dplyr)
+library(ggplot2)
+
+# Function to compute discrete ROC with thresholds
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all",
+               ret = c("threshold","specificity","sensitivity"),
+               transpose = FALSE)
+  
+  tibble(
+    threshold = rc$threshold,
+    FPR       = 1 - rc$specificity,
+    TPR       = rc$sensitivity
+  )
+}
+
+# Function to smooth threshold vs FPR
+smooth_threshold_vs_fpr <- function(FPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+  
+  thr_fun <- splinefun(df$FPR, df$threshold, method = "monoH.FC")
+  fpr_grid <- seq(0, 1, length.out = n)
+  tibble(FPR = fpr_grid, threshold = thr_fun(fpr_grid))
+}
+
+# Apply per model
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_threshold_vs_fpr(dr$FPR, dr$threshold, n = 400)
+  }) %>%
+  ungroup()
+
+# Plot threshold vs FPR
+ggplot(smooth_results, aes(x = FPR, y = threshold, color = model_norm)) +
+  geom_line(size = 1.2) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+```
+
+### with Overlaid Points from Discrete ROC
+
+```{r}
+library(pROC)
+library(dplyr)
+library(ggplot2)
+
+# Discrete ROC with thresholds
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all",
+               ret = c("threshold","specificity","sensitivity"),
+               transpose = FALSE)
+  
+  tibble(
+    threshold = rc$threshold,
+    FPR       = 1 - rc$specificity,
+    TPR       = rc$sensitivity
+  )
+}
+
+# Smooth threshold vs FPR
+smooth_threshold_vs_fpr <- function(FPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+  
+  thr_fun <- splinefun(df$FPR, df$threshold, method = "monoH.FC")
+  fpr_grid <- seq(0, 1, length.out = n)
+  
+  tibble(FPR = fpr_grid, threshold = thr_fun(fpr_grid))
+}
+
+# Apply per model: discrete + smoothed
+discrete_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ discrete_roc(.x)) %>%
+  ungroup()
+
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_threshold_vs_fpr(dr$FPR, dr$threshold, n = 400)
+  }) %>%
+  ungroup()
+
+# Plot overlay: smoothed lines + discrete points
+ggplot() +
+  geom_line(data = smooth_results,
+            aes(x = FPR, y = threshold, color = model_norm),
+            size = 1.2) +
+  geom_point(data = discrete_results,
+             aes(x = FPR, y = threshold, color = model_norm),
+             size = 2, alpha = 0.7) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+```
+
+
+```{r}
+library(pROC)
+library(dplyr)
+library(ggplot2)
+
+# Trapezoidal integration helper
+trapz <- function(x, y) {
+  sum((y[-1] + y[-length(y)]) / 2 * diff(x))
+}
+
+# Discrete ROC with thresholds
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all",
+               ret = c("threshold","specificity","sensitivity"),
+               transpose = FALSE)
+  
+  tibble(
+    threshold = rc$threshold,
+    FPR       = 1 - rc$specificity,
+    TPR       = rc$sensitivity
+  )
+}
+
+# Smooth threshold vs FPR
+
+smooth_threshold_vs_fpr <- function(FPR, TPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+  
+  thr_fun <- splinefun(df$FPR, df$threshold, method = "monoH.FC")
+  tpr_fun <- splinefun(df$FPR, df$TPR, method = "monoH.FC")
+  
+  fpr_grid <- seq(0, 1, length.out = n)
+  thr_grid <- thr_fun(fpr_grid)
+  tpr_grid <- pmin(pmax(tpr_fun(fpr_grid), 0), 1)
+  
+  # AUC (integral of TPR vs FPR)
+  auc <- trapz(fpr_grid, tpr_grid)
+  
+  # Arc length of ROC curve
+  dy <- tpr_fun(fpr_grid, deriv = 1)   # <-- FIXED
+  arc <- trapz(fpr_grid, sqrt(1 + dy^2))
+  
+  tibble(FPR = fpr_grid, threshold = thr_grid, TPR = tpr_grid,
+         auc = auc, arc = arc)
+}
+
+# Apply per model: discrete + smoothed
+discrete_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ discrete_roc(.x)) %>%
+  ungroup()
+
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_threshold_vs_fpr(dr$FPR, dr$TPR, dr$threshold, n = 400)
+  }) %>%
+  ungroup()
+
+# Extract metrics per model for legend labels
+metrics <- smooth_results %>%
+  group_by(model_norm) %>%
+  summarise(auc = unique(auc), arc = unique(arc), .groups = "drop")
+
+legend_labels <- paste0(metrics$model_norm,
+                        " (AUC=", sprintf("%.3f", metrics$auc),
+                        ", Arc=", sprintf("%.3f", metrics$arc), ")")
+
+# Plot overlay: smoothed lines + discrete points
+ggplot() +
+  geom_line(data = smooth_results,
+            aes(x = FPR, y = threshold, color = model_norm),
+            size = 1.2) +
+  geom_point(data = discrete_results,
+             aes(x = FPR, y = threshold, color = model_norm),
+             size = 2, alpha = 0.7) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = NULL) +
+  scale_color_manual(values = c("Logistic Regression" = "green",
+                                "Decision Tree" = "red",
+                                "SVM" = "#7570b3"),
+                     labels = legend_labels) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = c(0.65, 0.25),
+        legend.background = element_rect(fill = alpha("white", 0.7), color = NA))
+
+```
+
+#### Corrected
+
+```{r}
+# --- Smoothed ROC for metrics ---
+smooth_roc <- function(FPR, TPR, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR) %>% arrange(FPR) %>% distinct(FPR, .keep_all = TRUE)
+  mono_fun <- splinefun(x = df$FPR, y = df$TPR, method = "monoH.FC")
+  x <- seq(0, 1, length.out = n)
+  y <- pmin(pmax(mono_fun(x), 0), 1)
+  
+  auc <- trapz(x, y)
+  dy <- mono_fun(x, deriv = 1)
+  arc <- trapz(x, sqrt(1 + dy^2))
+  
+  tibble(FPR = x, TPR = y, auc = auc, arc = arc)
+}
+
+# --- Threshold vs FPR for visualization ---
+smooth_threshold_vs_fpr <- function(FPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+  
+  thr_fun <- splinefun(df$FPR, df$threshold, method = "monoH.FC")
+  fpr_grid <- seq(0, 1, length.out = n)
+  tibble(FPR = fpr_grid, threshold = thr_fun(fpr_grid))
+}
+
+```
+
+#### Plot
+
+```{r}
+# Discrete ROC
+discrete_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ discrete_roc(.x)) %>%
+  ungroup()
+
+# Smoothed ROC (metrics)
+smooth_metrics <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_roc(dr$FPR, dr$TPR, n = 400)
+  }) %>%
+  summarise(auc = unique(auc), arc = unique(arc), .groups = "drop")
+
+# Smoothed threshold vs FPR (visualization)
+smooth_thresholds <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_threshold_vs_fpr(dr$FPR, dr$threshold, n = 400)
+  }) %>%
+  ungroup()
+
+# Legend labels from metrics
+legend_labels <- paste0(smooth_metrics$model_norm,
+                        " (AUC=", sprintf("%.3f", smooth_metrics$auc),
+                        ", Arc=", sprintf("%.3f", smooth_metrics$arc), ")")
+
+# Plot overlay
+ggplot() +
+  geom_line(data = smooth_thresholds,
+            aes(x = FPR, y = threshold, color = model_norm),
+            size = 1.2) +
+  geom_point(data = discrete_results,
+             aes(x = FPR, y = threshold, color = model_norm),
+             size = 2, alpha = 0.7) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = NULL) +
+  scale_color_manual(values = c("Logistic Regression" = "green",
+                                "Decision Tree" = "red",
+                                "SVM" = "#7570b3"),
+                     labels = legend_labels) +
+  theme_classic(base_size = 14)
+
+```
+
+```{r}
+library(pROC)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tibble)
+
+# Helpers
+trapz <- function(x, y) {
+  if (length(x) < 2) return(NA_real_)
+  sum((y[-1] + y[-length(y)]) / 2 * diff(x))
+}
+
+# 1) Discrete ROC per model with consistent padding and monotonicity
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),  # control first, positive second
+                 direction = "<")
+
+  rc <- coords(roc_obj, "all",
+               ret = c("threshold","specificity","sensitivity"),
+               transpose = FALSE)
+
+  # Build discrete curve
+  FPR <- 1 - rc$specificity
+  TPR <- rc$sensitivity
+  thr <- rc$threshold
+
+  # Pad endpoints and enforce order
+  FPR <- c(0, FPR, 1)
+  TPR <- c(0, TPR, 1)
+  thr <- c(min(thr[is.finite(thr)], na.rm = TRUE), thr, max(thr[is.finite(thr)], na.rm = TRUE))
+
+  ord <- order(FPR, TPR)                # sort primarily by FPR, tie-break by TPR
+  FPR <- FPR[ord]
+  TPR <- TPR[ord]
+  thr <- thr[ord]
+
+  # Enforce monotone TPR (ROC non-decreasing in TPR)
+  TPR <- cummax(TPR)
+
+  tibble(FPR = FPR, TPR = TPR, threshold = thr) %>%
+    filter(is.finite(FPR), is.finite(TPR)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+}
+
+# 2) Smoothed ROC for metrics (TPR as function of FPR), single grid
+smooth_roc_metrics <- function(FPR, TPR, n = 400) {
+  # Domain grid fixed to [0,1] for comparability
+  x <- seq(0, 1, length.out = n)
+
+  # Monotone spline in TPR(FPR)
+  mono_fun <- splinefun(x = FPR, y = TPR, method = "monoH.FC")
+  y <- pmin(pmax(mono_fun(x), 0), 1)
+
+  # Metrics on this exact grid
+  auc <- trapz(x, y)
+  dy  <- mono_fun(x, deriv = 1)
+  arc <- trapz(x, sqrt(1 + dy^2))
+
+  tibble(FPR = x, TPR = y, auc = auc, arc = arc)
+}
+
+# 3) Threshold mapping for visualization only: threshold(FPR)
+smooth_threshold_vs_fpr <- function(FPR, threshold, n = 400) {
+  # Clean and prepare
+  df <- tibble(FPR = FPR, threshold = threshold) %>%
+    filter(is.finite(FPR), is.finite(threshold)) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+
+  fpr_grid <- seq(0, 1, length.out = n)
+
+  # If thresholds are not monotone in FPR, use regular spline (visual only),
+  # otherwise monotone Hermite would be fine. We don't use this for metrics.
+  thr_fun <- splinefun(df$FPR, df$threshold, method = "fmm")
+  tibble(FPR = fpr_grid, threshold = thr_fun(fpr_grid))
+}
+
+# 4) Apply per model: one discrete foundation; consistent smoothing and metrics
+# df is your working copy containing model_norm, Class, .pred_1
+# Do not modify all_preds; df <- all_preds_2 or your cleaned copy
+discrete_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ discrete_roc(.x)) %>%
+  ungroup()
+
+# Smoothed ROC metrics (TPR ~ FPR) on the same grid for all models
+smooth_metrics_curves <- discrete_results %>%
+  group_by(model_norm) %>%
+  group_modify(~ smooth_roc_metrics(.x$FPR, .x$TPR, n = 400)) %>%
+  ungroup()
+
+# Metrics table (identical to what the curves carry)
+metrics <- smooth_metrics_curves %>%
+  group_by(model_norm) %>%
+  summarise(auc = unique(auc), arc = unique(arc), .groups = "drop")
+
+# Threshold visualization (threshold ~ FPR) from the same discrete foundation
+smooth_thresholds <- discrete_results %>%
+  group_by(model_norm) %>%
+  group_modify(~ smooth_threshold_vs_fpr(.x$FPR, .x$threshold, n = 400)) %>%
+  ungroup()
+
+# Legend labels from the smoothed ROC metrics (authoritative)
+legend_labels <- paste0(metrics$model_norm,
+                        " (AUC=", sprintf("%.3f", metrics$auc),
+                        ", Arc=", sprintf("%.3f", metrics$arc), ")")
+
+# Colors: match your cleaned model names exactly
+color_values <- c("Logistic Regression" = "green",
+                  "Decision Tree"       = "red",
+                  "SVM"                 = "#7570b3")
+
+# 5) Plot threshold vs FPR with overlay of discrete points; legend shows metrics
+ggplot() +
+  geom_line(data = smooth_thresholds,
+            aes(x = FPR, y = threshold, color = model_norm),
+            size = 1.2) +
+  geom_point(data = discrete_results,
+             aes(x = FPR, y = threshold, color = model_norm),
+             size = 2, alpha = 0.7) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = c(0.65, 0.25),
+        legend.background = element_rect(fill = alpha("white", 0.7), color = NA))
+
+# Optional: if you also want to replot the smoothed ROC curves to visually confirm metrics
+ggplot(smooth_metrics_curves, aes(x = FPR, y = TPR, color = model_norm)) +
+  geom_line(size = 1.2) +
+  labs(title = "Smoothed ROC (TPR vs FPR) — metrics source",
+       x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  theme_classic(base_size = 14)
+
+```
+```{r}
+# Build legend labels as three-line strings
+legend_labels <- paste0(metrics$model_norm, "\n",
+                        "AUC = ", sprintf("%.3f", metrics$auc), "\n",
+                        "Arc = ", sprintf("%.3f", metrics$arc))
+
+# Plot overlay: smoothed lines + discrete points
+ggplot() +
+  geom_line(data = smooth_thresholds,
+            aes(x = FPR, y = threshold, color = model_norm),
+            size = 1.2) +
+  geom_point(data = discrete_results,
+             aes(x = FPR, y = threshold, color = model_norm),
+             size = 2, alpha = 0.7) +
+  labs(title = "Threshold vs False Positive Rate (FPR)",
+       x = "False Positive Rate (FPR)",
+       y = "Threshold",
+       color = NULL) +
+  scale_color_manual(values = c("Logistic Regression" = "green",
+                                "Decision Tree"       = "red",
+                                "SVM"                 = "#7570b3"),
+                     labels = legend_labels) +
+  theme_classic(base_size = 18) +   # larger base font for plot area
+  theme(
+    plot.margin = margin(40, 40, 40, 40),   # larger plot area
+    legend.position = c(0.75, 0.35),        # legend inside plot
+    legend.text = element_text(size = 8, lineheight = 0.9), # smaller legend text
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA)
+  )
+
+```
+
+#### Derivative with respect to FPR points
+
+```{r}
+df <- all_preds
+
+trapz <- function(x, y) {
+  sum((y[-1] + y[-length(y)]) / 2 * diff(x))
+}
+
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),   # control first, positive second
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all", ret = c("specificity","sensitivity"), transpose = FALSE)
+  FPR <- 1 - rc$specificity
+  TPR <- rc$sensitivity
+  
+  FPR <- c(0, FPR, 1)
+  TPR <- c(0, TPR, 1)
+  ord <- order(FPR, TPR)
+  FPR <- FPR[ord]
+  TPR <- cummax(TPR[ord])   # enforce monotonicity
+  
+  tibble(FPR = FPR, TPR = TPR)
+}
+
+# Modified smoother: also compute derivative of TPR wrt FPR
+smooth_roc <- function(FPR, TPR, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR) %>% arrange(FPR) %>% distinct(FPR, .keep_all = TRUE)
+  mono_fun <- splinefun(x = df$FPR, y = df$TPR, method = "monoH.FC")
+  
+  x <- seq(0, 1, length.out = n)
+  y <- pmin(pmax(mono_fun(x), 0), 1)
+  
+  auc <- trapz(x, y)
+  dy <- mono_fun(x, deriv = 1)   # derivative dTPR/dFPR
+  arc <- trapz(x, sqrt(1 + dy^2))
+  
+  tibble(FPR = x,
+         TPR = y,
+         auc = auc,
+         arc = arc,
+         dTPR_dFPR = dy)   # new column: derivative
+}
+
+# Normalize model names
+df <- df %>%
+  mutate(model_norm = sub(" \\(.*$", "", model))
+
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_roc(dr$FPR, dr$TPR, n = 400)
+  }) %>%
+  ungroup()
+
+metrics <- smooth_results %>%
+  group_by(model_norm) %>%
+  summarise(AUC = unique(auc), Arc = unique(arc), .groups = "drop")
+
+legend_labels <- setNames(
+  paste0(metrics$model_norm, "\nAUC = ", sprintf("%.3f", metrics$AUC),
+         "\nArc = ", sprintf("%.3f", metrics$Arc)),
+  metrics$model_norm
+)
+
+color_values <- setNames(
+  c("#d95f02", "#1b9e77", "#7570b3"),
+  unique(metrics$model_norm)
+)
+
+# Plot ROC curves
+ggplot(smooth_results, aes(x = FPR, y = TPR, color = model_norm)) +
+  geom_line(linewidth = 1.4) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  coord_fixed(ratio = 1, xlim = c(0,1), ylim = c(0,1), expand = FALSE) +
+  labs(title = "Smoothed ROC curves by model",
+       x = "False positive rate (FPR)",
+       y = "True positive rate (TPR)",
+       color = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  theme(
+    legend.position.inside = c(0.65, 0.25),
+    legend.text = element_text(size = 9, lineheight = 1.1),
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+# Optional: plot derivative curves
+ggplot(smooth_results, aes(x = FPR, y = dTPR_dFPR, color = model_norm)) +
+  geom_line(linewidth = 1.2) +
+  labs(title = "Derivative of ROC curve (dTPR/dFPR)",
+       x = "False positive rate (FPR)",
+       y = "dTPR/dFPR",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+
+```
+
+#### derivative withrespect to threshold
+
+```{r}
+smooth_roc <- function(FPR, TPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%          # drop Inf/-Inf
+    arrange(threshold) %>%
+    distinct(threshold, .keep_all = TRUE)     # remove duplicates
+  
+  # --- TPR(FPR) spline ---
+  roc_fun <- splinefun(df$FPR, df$TPR, method = "monoH.FC")
+  fpr_grid <- seq(0, 1, length.out = n)
+  tpr_grid <- pmin(pmax(roc_fun(fpr_grid), 0), 1)
+  dTPR_dFPR <- roc_fun(fpr_grid, deriv = 1)
+  
+  # --- TPR(threshold) spline ---
+  thr_fun <- splinefun(df$threshold, df$TPR, method = "monoH.FC")
+  thr_grid <- seq(min(df$threshold), max(df$threshold), length.out = n)
+  tpr_thr <- pmin(pmax(thr_fun(thr_grid), 0), 1)
+  dTPR_dThreshold <- thr_fun(thr_grid, deriv = 1)
+  
+  # --- Metrics ---
+  auc <- trapz(fpr_grid, tpr_grid)
+  arc <- trapz(fpr_grid, sqrt(1 + dTPR_dFPR^2))
+  
+  tibble(
+    FPR = fpr_grid,
+    TPR = tpr_grid,
+    threshold = thr_grid,
+    auc = auc,
+    arc = arc,
+    dTPR_dFPR = dTPR_dFPR,
+    dTPR_dThreshold = dTPR_dThreshold
+  )
+}
+
+```
+
+```{r}
+ggplot(smooth_results, aes(x = threshold, y = dTPR_dThreshold, color = model_norm)) +
+  geom_line() +
+  labs(title = "Derivative of TPR wrt Threshold",
+       x = "Threshold", y = "dTPR/dThreshold")
+
+
+```
+Work only with finite thresholds (filter(is.finite(threshold))).
+
+Restrict thresholds to the probability range [0,1] (since predictors are probabilities).
+
+Deduplicate thresholds before interpolation.
+
+Interpolate on a clean grid of thresholds, then evaluate TPR and FPR and their derivative
+
+
+```{r}
+discrete_roc <- function(df) {
+  roc_obj <- roc(response = df$Class,
+                 predictor = df$.pred_1,
+                 levels = c("2","1"),
+                 direction = "<")
+  
+  rc <- coords(roc_obj, "all",
+               ret = c("threshold","specificity","sensitivity"),
+               transpose = FALSE)
+  
+  FPR <- 1 - rc$specificity
+  TPR <- rc$sensitivity
+  thr <- rc$threshold
+  
+  tibble(FPR = FPR, TPR = TPR, threshold = thr)
+}
+
+smooth_roc <- function(FPR, TPR, threshold, n = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR, threshold = threshold) %>%
+    filter(is.finite(threshold)) %>%
+    arrange(threshold) %>%
+    distinct(threshold, .keep_all = TRUE)
+  
+  # TPR(FPR) spline
+  roc_fun <- splinefun(df$FPR, df$TPR, method = "monoH.FC")
+  fpr_grid <- seq(0, 1, length.out = n)
+  tpr_grid <- pmin(pmax(roc_fun(fpr_grid), 0), 1)
+  dTPR_dFPR <- roc_fun(fpr_grid, deriv = 1)
+  
+  # TPR(threshold) spline
+  tpr_thr_fun <- splinefun(df$threshold, df$TPR, method = "monoH.FC")
+  thr_grid <- seq(min(df$threshold), max(df$threshold), length.out = n)
+  dTPR_dThreshold <- tpr_thr_fun(thr_grid, deriv = 1)
+  
+  # FPR(threshold) spline
+  fpr_thr_fun <- splinefun(df$threshold, df$FPR, method = "monoH.FC")
+  dFPR_dThreshold <- fpr_thr_fun(thr_grid, deriv = 1)
+  
+  auc <- trapz(fpr_grid, tpr_grid)
+  arc <- trapz(fpr_grid, sqrt(1 + dTPR_dFPR^2))
+  
+  tibble(
+    FPR = fpr_grid,
+    TPR = tpr_grid,
+    threshold = thr_grid,
+    auc = auc,
+    arc = arc,
+    dTPR_dFPR = dTPR_dFPR,
+    dTPR_dThreshold = dTPR_dThreshold,
+    dFPR_dThreshold = dFPR_dThreshold   # <-- now explicitly returned
+  )
+}
+
+```
+
+```{r}
+smooth_results <- df %>%
+  group_by(model_norm) %>%
+  group_modify(~ {
+    dr <- discrete_roc(.x)
+    smooth_roc(dr$FPR, dr$TPR, dr$threshold, n = 400)
+  }) %>%
+  ungroup()
+
+ggplot(smooth_results, aes(x = threshold, y = dTPR_dThreshold, color = model_norm)) +
+  geom_line()
+
+ggplot(smooth_results, aes(x = threshold, y = dFPR_dThreshold, color = model_norm)) +
+  geom_line()
+
+```
+## Smoothed results
+
+
+```{r}
+smooth_roc <- function(FPR, TPR, threshold, n_thr = 400, n_roc = 400) {
+  df <- tibble(FPR = FPR, TPR = TPR, threshold = threshold) %>%
+    filter(is.finite(threshold), threshold >= 0, threshold <= 1,
+           is.finite(FPR), is.finite(TPR)) %>%
+    arrange(threshold) %>%
+    distinct(threshold, .keep_all = TRUE)
+
+  # --- Splines in threshold domain ---
+  tpr_thr_fun <- splinefun(df$threshold, df$TPR, method = "monoH.FC")
+  fpr_thr_fun <- splinefun(df$threshold, df$FPR, method = "monoH.FC")
+
+  thr_grid <- seq(min(df$threshold), max(df$threshold), length.out = n_thr)
+  TPR_thr <- pmin(pmax(tpr_thr_fun(thr_grid), 0), 1)
+  FPR_thr <- pmin(pmax(fpr_thr_fun(thr_grid), 0), 1)
+  dTPR_dThreshold <- tpr_thr_fun(thr_grid, deriv = 1)
+  dFPR_dThreshold <- fpr_thr_fun(thr_grid, deriv = 1)
+
+  # --- Splines in ROC domain (TPR vs FPR) for AUC/arc and ROC plotting ---
+  df_roc <- tibble(FPR = df$FPR, TPR = df$TPR) %>%
+    arrange(FPR) %>%
+    distinct(FPR, .keep_all = TRUE)
+  roc_fun <- splinefun(df_roc$FPR, df_roc$TPR, method = "monoH.FC")
+
+  FPR_roc <- seq(0, 1, length.out = n_roc)
+  TPR_roc <- pmin(pmax(roc_fun(FPR_roc), 0), 1)
+  dTPR_dFPR <- roc_fun(FPR_roc, deriv = 1)
+
+  # --- Metrics computed in ROC domain ---
+  trapz <- function(x, y) sum((y[-1] + y[-length(y)]) / 2 * diff(x))
+  auc <- trapz(FPR_roc, TPR_roc)
+  arc <- trapz(FPR_roc, sqrt(1 + dTPR_dFPR^2))
+
+  # --- Return both parameterizations ---
+  list(
+    threshold_curve = tibble(
+      threshold = thr_grid,
+      TPR_thr = TPR_thr,
+      FPR_thr = FPR_thr,
+      dTPR_dThreshold = dTPR_dThreshold,
+      dFPR_dThreshold = dFPR_dThreshold
+    ),
+    roc_curve = tibble(
+      FPR_roc = FPR_roc,
+      TPR_roc = TPR_roc,
+      dTPR_dFPR = dTPR_dFPR,
+      auc = auc,
+      arc = arc
+    )
+  )
+}
+
+```
+
+update the pipeline
+```{r}
+# Normalize model names
+df <- all_preds %>%
+  mutate(model_norm = sub(" \\(.*$", "", model))
+
+smooth_results_threshold <- df %>%
+  split(.$model_norm) %>%
+  purrr::imap_dfr(~ {
+    dr <- discrete_roc(.x)
+    out <- smooth_roc(dr$FPR, dr$TPR, dr$threshold, n_thr = 400, n_roc = 400)
+    out$threshold_curve %>% mutate(model_norm = .y)
+  })
+
+
+
+
+
+
+
+# Metrics table (AUC, Arc) from ROC parameterization
+metrics <- smooth_results_roc %>%
+  group_by(model_norm) %>%
+  summarise(AUC = unique(auc), Arc = unique(arc), .groups = "drop")
+
+```
+
+ensure discrete ROC returns threshold
+
+```{r}
+discrete_roc <- function(df) {
+  roc_obj <- pROC::roc(response = df$Class,
+                       predictor = df$.pred_1,
+                       levels = c("2","1"),
+                       direction = "<")
+
+  rc <- pROC::coords(roc_obj, "all",
+                     ret = c("threshold","specificity","sensitivity"),
+                     transpose = FALSE)
+
+  tibble(
+    FPR = 1 - rc$specificity,
+    TPR = rc$sensitivity,
+    threshold = rc$threshold
+  )
+}
+
+```
+
+
+
+```{r}
+# TPR vs threshold
+ggplot(smooth_results_threshold, aes(x = threshold, y = TPR_thr, color = model_norm)) +
+  geom_line(linewidth = 1.2) +
+  labs(title = "Smoothed TPR vs threshold",
+       x = "Threshold", y = "TPR",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+# FPR vs threshold
+ggplot(smooth_results_threshold, aes(x = threshold, y = FPR_thr, color = model_norm)) +
+  geom_line(linewidth = 1.2) +
+  labs(title = "Smoothed FPR vs threshold",
+       x = "Threshold", y = "FPR",
+       color = "Model") +
+  theme_classic(base_size = 14)
+
+```
+
+What these plots show
+TPR vs threshold: As the threshold increases, fewer positives are classified correctly, so TPR decreases monotonically.
+
+FPR vs threshold: As the threshold increases, fewer negatives are misclassified, so FPR also decreases monotonically.
+
+Together, these plots let you see the functional dependence of ROC components on the cutoff, rather than just the ROC curve itself.
+
+🧠 Why this matters
+These threshold‑based plots highlight decision regions: where small changes in threshold cause large changes in sensitivity or specificity.
+
+They also explain why your ROC slope can be zero or infinite: if one density vanishes at a threshold, the corresponding derivative is flat or vertical.
+
+Clinically, these plots are often more interpretable than the ROC curve alone, because they show exactly how performance metrics respond to threshold adjustments.
+
+
+
+Great observation — the “truncation at 0.5” you’re seeing for the decision tree curves is not a plotting bug, it’s a property of how the tree produces predictions.
+
+---
+
+### 🔎 Why the cutoff happens at 0.5
+- A **decision tree classifier** (at least in most implementations like `rpart`, `sklearn`, or tidymodels) does not output a continuous probability distribution across thresholds.  
+- Instead, each leaf node assigns a **class probability equal to the proportion of training samples in that leaf**.  
+- For binary classification, those probabilities are often **discrete values** like 0, 0.25, 0.5, 0.75, 1 depending on class composition in the leaves.  
+- When you plot TPR/FPR vs threshold, the curve only changes at those discrete probability values. If the tree never produces probabilities below 0.5 for the positive class, then the ROC threshold domain is truncated at 0.5.
+
+---
+
+### ⚖️ Intuition
+- Logistic regression, random forests, or boosting models produce **smooth probability scores** across the whole [0,1] range.  
+- A single decision tree, however, is **piecewise constant**: each leaf is a flat probability.  
+- That means the ROC curve is “chunky” and the threshold plots are truncated at the minimum and maximum leaf probabilities.  
+- In your case, the tree’s leaves only output probabilities ≥ 0.5 for the positive class, so the threshold plots stop at 0.5.
+
+---
+
+### 🧠 Clinical/analytical significance
+- This is not an error in your smoothing code — it reflects the **limited resolution of the decision tree’s probability estimates**.  
+- It explains why decision trees often have poor calibration: they can’t finely adjust thresholds because they only produce a handful of distinct probability values.  
+- That’s why ensemble methods (random forests, gradient boosting) are preferred when you want a full ROC curve across the entire [0,1] threshold range.
+
+---
+
+👉 If you’d like, I can show you how to **inspect the leaf probabilities of your decision tree** so you can see exactly which discrete values are being produced and why the ROC curve truncates at 0.5. Would you like me to walk through that?

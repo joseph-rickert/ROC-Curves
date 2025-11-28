@@ -1,0 +1,267 @@
+---
+title: "ROC-arclength lab"
+format: html
+---
+
+### Load Libraries
+
+```{r}
+# --- Block 1: Load libraries ---
+library(dplyr)
+library(ggplot2)
+library(pROC)
+library(splines)
+
+```
+
+### Helper Functions
+
+```{r}
+# --- Block 2: Helper functions ---
+
+# Compute cumulative arc length for discrete points
+compute_arc_length <- function(x, y) {
+  dx <- diff(x)
+  dy <- diff(y)
+  ds <- sqrt(dx^2 + dy^2)
+  return(c(0, cumsum(ds)))
+}
+
+# Compute discrete polyline curvature (approximate)
+compute_polyline_curvature <- function(x, y) {
+  dx <- diff(x)
+  dy <- diff(y)
+  theta <- atan2(dy, dx)
+  dtheta <- c(NA, diff(theta))
+  ds <- sqrt(dx^2 + dy^2)
+  curvature <- dtheta / ds
+  return(c(NA, curvature))
+}
+
+# Compute smooth ROC curve and curvature using splines
+compute_smooth_roc <- function(FPR, TPR, spar = 0.7, n_points = 200) {
+  spline_fit <- smooth.spline(x = FPR, y = TPR, spar = spar)
+  FPR_smooth <- seq(0, 1, length.out = n_points)
+  TPR_smooth <- predict(spline_fit, x = FPR_smooth)$y
+  
+  dy_dx   <- predict(spline_fit, x = FPR_smooth, deriv = 1)$y
+  d2y_dx2 <- predict(spline_fit, x = FPR_smooth, deriv = 2)$y
+  curvature <- d2y_dx2 / ( (1 + dy_dx^2)^(3/2) )
+  
+  arc_length <- compute_arc_length(FPR_smooth, TPR_smooth)
+  
+  data.frame(FPR = FPR_smooth,
+             TPR = TPR_smooth,
+             ArcLength = arc_length,
+             Curvature = curvature)
+}
+
+# --- Patch to Block 2: add evaluator for smoothed curvature at given x ---
+eval_smooth_curvature <- function(spline_fit, x) {
+  dy_dx   <- predict(spline_fit, x = x, deriv = 1)$y
+  d2y_dx2 <- predict(spline_fit, x = x, deriv = 2)$y
+  d2y_dx2 / ( (1 + dy_dx^2)^(3/2) )
+}
+```
+
+
+### Test data
+
+```{r}
+# --- Block 3: Test data generation ---
+
+set.seed(123)
+
+# Parameters (easy to change)
+# default Parameters
+# n_signal <- 200
+# n_noise  <- 300
+# signal_mean <- 1.0
+# noise_mean  <- 0.0
+# signal_sd   <- 1.0
+# noise_sd    <- 1.0
+
+n_obs <- 400
+n_signal <- 100
+n_noise  <- n_obs - n_signal
+signal_mean <- 1.0
+signal_sd   <- 1.0
+noise_mean  <- 0.0
+noise_sd    <- 2.0
+
+
+
+
+# Distribution functions (swap out easily)
+signal_dist <- function(n) rnorm(n, mean = signal_mean, sd = signal_sd)
+noise_dist  <- function(n) rnorm(n, mean = noise_mean, sd = noise_sd)
+
+# Generate test data
+test_data <- data.frame(
+  Class = c(rep(1, n_signal), rep(2, n_noise)),   # 1 = signal, 2 = noise
+  probability = c(signal_dist(n_signal), noise_dist(n_noise))
+)
+
+```
+
+### Main Calculations
+
+```{r}
+# --- Block 4: Main calculations ---
+
+# Build ROC object
+roc_obj <- roc(response = test_data$Class,
+               predictor = test_data$probability,
+               levels = c(2,1),
+               direction = "<")
+
+roc_df <- data.frame(
+  threshold   = roc_obj$thresholds,
+  TPR         = roc_obj$sensitivities,
+  FPR         = 1 - roc_obj$specificities,
+  Specificity = roc_obj$specificities
+)
+
+# Discrete arc length and curvature
+roc_df$ArcLength <- compute_arc_length(roc_df$FPR, roc_df$TPR)
+roc_df$Curvature <- compute_polyline_curvature(roc_df$FPR, roc_df$TPR)
+
+# Smooth ROC
+
+roc_smooth_df <- compute_smooth_roc(roc_df$FPR, roc_df$TPR, spar = 0.7, n_points = 200)
+# --- Patch to Block 4: compute smoothed curvature at thresholds ---
+# Keep existing spline_fit by refitting here for clarity
+spline_fit <- smooth.spline(x = roc_df$FPR, y = roc_df$TPR, spar = 0.7)
+
+# Smoothed curvature evaluated at the empirical FPR points (i.e., thresholds)
+roc_df <- roc_df %>%
+  mutate(Curvature_smooth = eval_smooth_curvature(spline_fit, FPR))
+
+
+# AUC values
+auc_raw <- auc(roc_obj)
+#auc_smooth <- sum((roc_smooth_df$TPR[-1] + roc_smooth_df$TPR[-nrow(roc_smooth_df)]) / 2 *
+                  #diff(roc_smooth_df$FPR))
+auc_smooth <- sum((roc_df$TPR[-1] + roc_df$TPR[-nrow(roc_df)]) / 2 *
+                  diff(roc_df$FPR))
+```
+
+### Raw vs Smoothed ROC
+
+```{r}
+# --- Plot 1: Raw vs Smoothed ROC ---
+ggplot() +
+  geom_line(data = roc_df, aes(x = FPR, y = TPR),
+            color = "blue", linewidth = .8, alpha = 0.7) +
+  geom_point(data = roc_df, aes(x = FPR, y = TPR),
+             color = "red", size = .5, alpha = 0.7) +
+  geom_line(data = roc_smooth_df, aes(x = FPR, y = TPR),
+            color = "black", linewidth = .5) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  labs(title = "Raw vs Smoothed ROC Curve",
+       x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)") +
+  annotate("text", x = 0.6, y = 0.2,
+           label = paste0("Raw AUC = ", round(auc_raw, 3),
+                          "\nSmooth AUC = ", round(auc_smooth, 3),
+                          "\nSmooth Arc Length = ", round(max(roc_smooth_df$ArcLength), 3)),
+           hjust = 0, size = 5, color = "black") +
+  theme_minimal()
+
+```
+
+
+```{r}
+# --- Raw AUC ---
+auc_raw <- auc(roc_obj)
+
+# --- Raw partial AUC (FPR ≤ 0.5) ---
+roc_half_raw <- roc_df %>% filter(FPR <= 0.5)
+raw_pAUC <- sum((roc_half_raw$TPR[-1] + roc_half_raw$TPR[-nrow(roc_half_raw)]) / 2 *
+                diff(roc_half_raw$FPR))
+
+# --- Smoothed AUC ---
+AUC_smooth <- sum((roc_df$TPR[-1] + roc_df$TPR[-nrow(roc_df)]) / 2 *
+                  diff(roc_df$FPR))
+
+# --- Smoothed partial AUC (FPR ≤ 0.5) ---
+roc_half_smooth <- roc_df %>% filter(FPR <= 0.5)
+smooth_pAUC <- sum((roc_half_smooth$TPR[-1] + roc_half_smooth$TPR[-nrow(roc_half_smooth)]) / 2 *
+                   diff(roc_half_smooth$FPR))
+
+roc_half_raw <- roc_df %>% filter(FPR <= 0.5) %>% arrange(FPR)
+
+raw_pAUC <- sum((roc_half_raw$TPR[-1] + roc_half_raw$TPR[-nrow(roc_half_raw)]) / 2 *
+                diff(roc_half_raw$FPR))
+
+
+# --- Total smoothed arc length ---
+dx_total <- diff(roc_df$FPR)
+dy_total <- diff(roc_df$TPR)
+ds_total <- sqrt(dx_total^2 + dy_total^2)
+arc_length_total <- sum(ds_total)
+
+# --- Partial smoothed arc length (FPR ≤ 0.5) ---
+dx_half <- diff(roc_half_smooth$FPR)
+dy_half <- diff(roc_half_smooth$TPR)
+ds_half <- sqrt(dx_half^2 + dy_half^2)
+arc_length_half <- sum(ds_half)
+
+# --- Plot with amended legend ---
+ggplot() +
+  geom_line(data = roc_df, aes(x = FPR, y = TPR),
+            color = "#d95f02", size = 1.2, alpha = 0.7) +
+  geom_point(data = roc_df, aes(x = FPR, y = TPR),
+             color = "red", size = 0.5, alpha = 0.7) +
+  geom_line(data = roc_df, aes(x = FPR, y = TPR),
+            color = "black", linewidth = .5) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  labs(title = "Raw vs Smoothed ROC Curve",
+       x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)") +
+  annotate("text", x = 0.4, y = 0.2,
+           label = paste0("Raw AUC = ", round(auc_raw, 3),
+                          "\nSmoothed AUC = ", round(AUC_smooth, 3),
+                          "\nRaw pAUC (≤0.5) = ", round(raw_pAUC, 3),
+                          "\nSmoothed pAUC (≤0.5) = ", round(smooth_pAUC, 3),
+                          "\nTotal smoothed arc length = ", round(arc_length_total, 3),
+                          "\nPartial smoothed arc length (≤0.5) = ", round(arc_length_half, 3)),
+           hjust = 0, size = 3 , color = "black") +
+  theme_minimal()
+
+
+```
+
+
+
+
+
+
+### Smoothed Curvature vs Threshold
+
+```{r}
+# --- Corrected Plot 2: Smoothed curvature vs threshold ---
+ggplot(roc_df, aes(x = threshold, y = Curvature_smooth)) +
+  geom_line(color = "#2C7FB8", size = 1.3) +
+  labs(title = "Smoothed ROC curvature vs threshold",
+       x = "Threshold",
+       y = "Smoothed curvature") +
+  theme_minimal()
+
+
+```
+
+### Smoothed Curvature vs arclength
+
+```{r}
+# --- Plot 3: Smoothed curvature vs cumulative arc length ---
+ggplot(roc_df, aes(x = ArcLength, y = Curvature)) +
+  geom_line(color = "#2C7FB8", size = 1.3) +
+  labs(title = "Smoothed ROC Curvature vs Cumulative Arc Length",
+       x = "Cumulative Arc Length",
+       y = "Curvature") +
+  theme_minimal()
+
+```
+
+
