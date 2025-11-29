@@ -6,7 +6,17 @@ date: November 22, 2025
 format: html
 ---
 
-This post makes the case for using arclength as a complementary measure to AUC.
+This post is an attempt to make the case for using the arclength of a smoothed ROC curve as a complementary to Area Under the Curve (AUC) as a measure of classifier performance. The main insight is that ROC curve is the direct representation of the conditional probability distribution related to True Positive Rate (TPR) and False Positive Rate (FPR). Each point (x,y) on the ROC curve equals $P(TPR \le y \mid FPR \le x)$. This a direct, and to my mind clear, probability statement. AUC is an indirect measure with the probability interpretation usually rendered something like the definition provided in [wikipedia](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#:~:text=The%20area%20under%20the%20curve,ranks%20higher%20than%20'negative')
+
+>"AUC is equal to the probability that a classifier will rank a randomly chosen positive instance higher than a randomly chosen negative one (assuming 'positive' ranks higher than 'negative')'. 
+
+I don't see how this is useful.
+
+It is also the case that arclength is a linear measure while AUC is an area. I may very well be be wrong about this, but I think most people have a better intuition of the practical significance of a linear difference of 0.3 than an area difference of 0.3.
+
+Finally, arclength is directly related to the geometry of the ROC curve and some basic ideas of differential geometry may be useful in interpreting the behavior of ROC curves.
+
+## Part 1: a basic example
 
 ### 1. Load the Required Packages
 ```{r}
@@ -26,9 +36,9 @@ tidymodels_prefer()
 ```
 
 
-
-
 ### Some suitable data sets from R packages
+
+In this section I have three suitable data sets from R packages and put the data, abstracted just two features and put them in a form suitable for some simple tidy modeling.
 ```{r}
 #| message: FALSE
 #| warning: FALSE
@@ -58,9 +68,9 @@ aSAH2 <- aSAH %>% mutate(
 
 ```
 
+### Select the Data Set
 
-
-### Select the Data Set and Split the Data
+The code in this section selects one of the data sets and prepares it for classification.
 ```{r}
 #| message: FALSE
 #| warning: FALSE
@@ -74,7 +84,7 @@ set.seed(123)
 #df<- two_class_dat2 # try FPC = 1, FNC = 10
 #df <- Pima.tr2 # try FPC = 10 , FNC = 1
 df <- aSAH2 #try FPC = 1, FNC = 1
-#head(df)
+head(df)
 
 # Split the data into training and testing sets
 data_split <- initial_split(df, prop = 0.75, strata = Class)
@@ -83,6 +93,7 @@ test_data <- testing(data_split)
 
 ```
 
+The data frame has two features and a class label.
 
 ### Set up the tidymodels workflows for three models: logistic regression, SVM, and decision tree
 ```{r}
@@ -342,6 +353,231 @@ ggplot(smooth_results, aes(x = FPR, y = TPR, color = model_norm)) +
   )
 
 ```
+
+
+
+
+
+```{r}
+ggplot(roc_results, aes(x = FPR, y = TPR,
+                        color = model_norm,
+                        linetype = curve_type)) +
+  geom_line(linewidth = 0.6) +
+  geom_abline(slope = 1, intercept = 0,
+              linetype = "dashed", color = "grey60") +
+  labs(title = "ROC curves by model",
+       x = "False Positive Rate",
+       y = "True Positive Rate",
+       color = NULL, linetype = NULL) +
+  scale_color_manual(values = color_values, labels = legend_labels) +
+  scale_linetype_manual(values = c("raw" = "dashed", "smooth" = "solid")) +
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(size = 10, face = "bold"),
+    axis.title = element_text(size = 9),
+    axis.text  = element_text(size = 8),
+    legend.position = c(0.65, 0.25),  # inside plot, under diagonal
+    legend.text = element_text(size = 7, lineheight = 1.1),
+    legend.background = element_rect(fill = alpha("white", 0.8), color = NA),
+    legend.key.size = unit(0.5, "lines"),
+    plot.margin = margin(2, 2, 2, 2)  # minimal margin
+  )
+
+```
+
+
+```{r}
+# library(pROC)
+# library(dplyr)
+# library(ggplot2)
+# library(purrr)
+
+# df_raw: columns .pred_1, .pred_2, Class, model
+# smooth_results: columns model_norm, FPR, TPR, auc, arc
+
+# 1) Normalize model names in the raw data so they match smooth_results$model_norm
+df_raw <- all_preds %>%
+  mutate(model_norm = sub(" \\(.*$", "", model))  # e.g., "Logistic Regression (AUC = ...)" -> "Logistic Regression"
+
+# 2) Compute raw ROC coordinates and raw AUC per model
+raw_results <- df_raw %>%
+  group_by(model_norm) %>%
+  group_map(~{
+    roc_obj <- roc(response = .x$Class,
+                   predictor = .x$.pred_1,
+                   levels = c("2","1"),
+                   direction = "<")
+
+    rc <- coords(roc_obj, "all", ret = c("specificity","sensitivity"), transpose = FALSE)
+    FPR <- 1 - rc$specificity
+    TPR <- rc$sensitivity
+
+    # pad ends, order, enforce monotone TPR
+    FPR <- c(0, FPR, 1)
+    TPR <- c(0, TPR, 1)
+    ord <- order(FPR, TPR)
+    FPR <- FPR[ord]
+    TPR <- cummax(TPR[ord])
+
+    auc_raw <- as.numeric(auc(roc_obj))
+    m <- .y$model_norm[[1]]  # group label; safer than looking back into .x
+
+    tibble(
+      model_norm = rep(m, length(FPR)),
+      FPR = FPR,
+      TPR = TPR,
+      auc_raw = rep(auc_raw, length(FPR)),
+      curve_type = rep("raw", length(FPR))
+    )
+  }) %>%
+  bind_rows()
+
+# 3) Prepare smoothed results to match columns (add curve_type and placeholder auc_raw)
+smooth_results_plot <- smooth_results %>%
+  mutate(
+    curve_type = "smooth",
+    auc_raw = NA_real_  # placeholder so bind_rows columns align
+  )
+
+# 4) Combine raw + smooth results
+roc_results <- bind_rows(raw_results, smooth_results_plot)
+
+# 5) Build legend metrics: Raw AUC (from raw_results), Smooth AUC and Arc (from smooth_results)
+metrics_raw <- raw_results %>%
+  distinct(model_norm, auc_raw) %>%
+  rename(AUC_raw = auc_raw)
+
+metrics_smooth <- smooth_results %>%
+  distinct(model_norm, auc, arc) %>%
+  rename(AUC_smooth = auc, Arc = arc)
+
+metrics <- metrics_raw %>%
+  left_join(metrics_smooth, by = "model_norm")
+
+legend_labels <- setNames(
+  paste0(metrics$model_norm,
+         "\nRaw AUC = ", sprintf("%.3f", metrics$AUC_raw),
+         "\nSmooth AUC = ", sprintf("%.3f", metrics$AUC_smooth),
+         "\nArc = ", sprintf("%.3f", metrics$Arc)),
+  metrics$model_norm
+)
+
+# 6) Pastel colors (keep model association). Ensure names match smooth_results$model_norm exactly.
+color_values <- c(
+  "Decision Tree"        = "#fcae91",  # pastel red
+  "Logistic Regression"  = "#a1d99b",  # pastel green
+  "SVM"                  = "#9ecae1"   # pastel blue
+)
+
+# 7) Plot: raw dashed thin, smooth solid thin, smaller text, legend inside plot, larger plot area
+# ggplot(roc_results, aes(x = FPR, y = TPR,
+#                         color = model_norm,
+#                         linetype = curve_type)) +
+#   geom_line(linewidth = 0.6) +
+#   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey60") +
+#   scale_color_manual(values = color_values, labels = legend_labels) +
+#   scale_linetype_manual(values = c("raw" = "dashed", "smooth" = "solid")) +
+#   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+#   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+#   labs(title = "ROC curves by model (raw vs smoothed)",
+#        x = "False Positive Rate",
+#        y = "True Positive Rate",
+#        color = NULL, linetype = NULL) +
+#   theme_minimal(base_size = 10) +
+#   theme(
+#     plot.title = element_text(size = 9, face = "bold"),
+#     axis.title = element_text(size = 8),
+#     axis.text  = element_text(size = 7),
+#     legend.position = c(0.65, 0.25),   # inside plot, under diagonal
+#     legend.text = element_text(size = 7, lineheight = 1.1),
+#     legend.background = element_rect(fill = alpha("white", 0.8), color = NA),
+#     legend.key.size = unit(0.5, "lines"),
+#     plot.margin = margin(2, 2, 2, 2)   # minimal margins to enlarge plot area
+#   )
+
+legend_labels <- setNames(
+  paste0(metrics$model_norm,
+         "\nRaw AUC = ", sprintf("%.3f", metrics$AUC_raw),
+         " | Smooth AUC = ", sprintf("%.3f", metrics$AUC_smooth),
+         "\nArc = ", sprintf("%.3f", metrics$Arc),
+         "\n"),   # blank line between models
+  metrics$model_norm
+)
+# ggplot(roc_results, aes(x=FPR, y=TPR,
+#                         color=model_norm,
+#                         linetype=curve_type)) +
+#   geom_line(linewidth=0.6) +
+#   geom_abline(slope=1, intercept=0,
+#               linetype="dashed", color="grey60") +
+#   scale_color_manual(values=color_values, labels=legend_labels) +
+#   scale_linetype_manual(values=c("raw"="dashed","smooth"="solid")) +
+#   scale_x_continuous(limits=c(0,1), expand=c(0,0)) +
+#   scale_y_continuous(limits=c(0,1), expand=c(0,0)) +
+#   labs(title="ROC curves by model (raw vs smoothed)",
+#        x="False Positive Rate",
+#        y="True Positive Rate",
+#        color=NULL, linetype=NULL) +
+#   guides(
+#     color = guide_legend(order=1),
+#     linetype = guide_legend(
+#       override.aes = list(color="black"),
+#       label.theme = element_text(size=7),
+#       title=NULL,
+#       order=2
+#     )
+#   ) +
+#   theme_minimal(base_size=10) +
+#   theme(
+#     plot.title = element_text(size=9, face="bold"),
+#     axis.title = element_text(size=8),
+#     axis.text  = element_text(size=7),
+#     legend.position = c(0.65, 0.25),   # inside plot, under diagonal
+#     legend.text = element_text(size=7, lineheight=1.2),
+#     legend.background = element_rect(fill=alpha("white",0.8), color=NA),
+#     legend.key.size = unit(0.5,"lines"),
+#     plot.margin = margin(2,2,2,2)
+#   )
+ggplot(roc_results, aes(x=FPR, y=TPR,
+                        color=model_norm,
+                        linetype=curve_type)) +
+  geom_line(linewidth=0.6) +
+  geom_abline(slope=1, intercept=0,
+              linetype="dashed", color="grey60") +
+  scale_color_manual(values=color_values, labels=legend_labels) +
+  scale_linetype_manual(
+    values = c("raw"="dashed", "smooth"="solid"),
+    labels = c("raw"="Raw ROC: dashed", "smooth"="Smoothed ROC: solid")
+  ) +
+  scale_x_continuous(limits=c(0,1), expand=c(0,0)) +
+  scale_y_continuous(limits=c(0,1), expand=c(0,0)) +
+  labs(title="ROC curves by model (raw vs smoothed)",
+       x="False Positive Rate",
+       y="True Positive Rate",
+       color=NULL, linetype=NULL) +
+  guides(
+    color = guide_legend(order = 1, title = NULL, label.theme = element_text(size = 7)),
+    linetype = guide_legend(order = 2, title = NULL, label.theme = element_text(size = 7))
+  ) +
+  theme_minimal(base_size=10) +
+  theme(
+    plot.title = element_text(size=9, face="bold"),
+    axis.title = element_text(size=8),
+    axis.text  = element_text(size=7),
+    legend.position = c(0.65, 0.25),   # inside plot, under diagonal
+    legend.text = element_text(size=7, lineheight=1.2),
+    legend.background = element_rect(fill = alpha("white", 0.8), color = NA),
+    legend.key.size = unit(0.5, "lines"),
+    plot.margin = margin(2, 2, 2, 2)
+  )
+
+
+```
+
+
+
+
+
+
 
 ### Parital AUC and Arc Length (FPR ≤ 0.5)
 
@@ -1041,7 +1277,7 @@ smooth_roc <- function(FPR, TPR, threshold, n = 400) {
   auc <- trapz(fpr_grid, tpr_grid)
   arc <- trapz(fpr_grid, sqrt(1 + dTPR_dFPR^2))
   
-  tibble(
+ smooth_results<- tibble(
     FPR = fpr_grid,
     TPR = tpr_grid,
     threshold = thr_grid,
