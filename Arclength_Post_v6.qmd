@@ -218,9 +218,9 @@ color_values <- c(
 roc_data <- roc_data %>%
   mutate(model = factor(model, levels = auc_data$model))
 
-# An alternative plot with more elaborate formating.
+# An alternative plot with more elaborate formatting.
 # Plot raw step-function ROC curves
-#gplot(roc_data, aes(x = 1 - specificity, y = sensitivity, color = model)) +
+#ggplot(roc_data, aes(x = 1 - specificity, y = sensitivity, color = model)) +
   # geom_path(size = 1.4) +
   # geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
   # coord_fixed(ratio = 1, xlim = c(0,1), ylim = c(0,1), expand = FALSE) +
@@ -472,7 +472,7 @@ I always ask my self when would I want to perform this experiment, and never com
 
 It is also the case that arc length is a linear measure while AUC is an area. I may very well be be wrong about this, but I think most people have a better intuition of the practical significance of a linear difference of 0.3 inches than an area difference of 0.3 square inches.
 
-Arc length also mostly avoids the criticism of AUC that led to the development of [Partial Arc length](https://en.wikipedia.org/wiki/Partial_Area_Under_the_ROC_Curve). It is relatively easy to exclude segments of regions that are not important to the application. An unless the ROC curve pathelogically crosses the diagonal at FPR > .5 and TPR < .5 it will not be troubled region of [low sensitivity and low specificity](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#:~:text=The%20main%20criticism%20to%20the,the%20plot%20on%20the%20right.).
+Arc length also mostly avoids the criticism of AUC that led to the development of [Partial Arc length](https://en.wikipedia.org/wiki/Partial_Area_Under_the_ROC_Curve). It is relatively easy to exclude segments of regions that are not important to the application. An unless the ROC curve pathologically crosses the diagonal at FPR > .5 and TPR < .5 it will not be troubled region of [low sensitivity and low specificity](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#:~:text=The%20main%20criticism%20to%20the,the%20plot%20on%20the%20right.).
 
 Finally, arc length is directly related to the geometry of the ROC curve and as I hope to convince you below, some basic ideas of differential geometry may be useful in interpreting the behavior of ROC curves. The following table is as close as I can come to a fair comparison of the two metrics. I hope you find it useful, however, I despair of ever seeing a clinical practitioner abandoning AUC.
 
@@ -664,7 +664,7 @@ print(grid_plot)
 
 ```
 
-It a well known result from mathematical statistics, not usually emphasized in a machine learning context, that the slope of the tangent to the ROC curve at any point is equal to the the instantaneous likelihood ratio at that point. [Choi (1998)](https://academic.oup.com/aje/article-abstract/148/11/1127/123231?redirectedFrom=PDF). This is exactly what is plotted in the second column. However, to understand the connection with differential geometry, the following section of code rederives the plot by considering ROC curves parameterized by threshold $t \in [0,1]$ so the curve is the set of points $(FPR(t),TPR(t))$. This point of view is preferred for analyzing likelihood ratios and connecting with diagnostic test theory. In both cases the likelihood ratio is identical since likelihood is a property of the curve and $\frac{d(TPR)}{d(FPR)} = \frac{d(TPR)/dt))}{d(FPR)/dt}$
+It a well known result from mathematical statistics, not usually emphasized in a machine learning context, that the slope of the tangent to the ROC curve at any point is equal to the the instantaneous likelihood ratio at that point. [Choi (1998)](https://academic.oup.com/aje/article-abstract/148/11/1127/123231?redirectedFrom=PDF). This is exactly what is plotted in the second column. However, to understand the connection with differential geometry, the following section of code re derives the plot by considering ROC curves parameterized by threshold $t \in [0,1]$ so the curve is the set of points $(FPR(t),TPR(t))$. This point of view is preferred for analyzing likelihood ratios and connecting with diagnostic test theory. In both cases the likelihood ratio is identical since likelihood is a property of the curve and $\frac{d(TPR)}{d(FPR)} = \frac{d(TPR)/dt))}{d(FPR)/dt}$
 
 
 ```{r}
@@ -829,7 +829,7 @@ A standard interpretation for a diagnostic test is that LR+ values above 10 are 
 
 Our final topic will be to take a brief look at curvature. The curvature, $\kappa(t)$ of a two dimensional planer curve, like an ROC curve, measures how sharply the curve bends at a given threshold, $t$. Computing it involves computing second derivatives as the equations in the Appendix show. High curvature implies rapidly changing slope while low curvature indicates that slope is changing slowly. The derivative of curvature (a third derivative) indicates how fast the changing slope itself is changing. Large positive values of $d\kappa(t)/dt$ can indicate threshold zone where small changes in the decision rule can produce large changes in discrimination. Large negative values of $d\kappa(t)/dt$ can indicate zones where slope changes are stabilizing suggesting diminishing returns for tightening or loosening the decision rules. Zones with values near zero indicate regions that are relatively stable with respect of threshold. The following code calculates $\kappa(t)$ and $d\kappa(t)/dt$ for each of the three models and plots them side by side.
 
-These ideas my be helpful in understanding the tradeoffs involved is selecting a threshold for a particular applicature.
+These ideas my be helpful in understanding the trade offs involved is selecting a threshold for a particular application.
 
 
 ```{r}
