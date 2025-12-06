@@ -1,0 +1,10 @@
+---
+title: "Test Document"
+bibliography: DG-references.bib
+format: html
+---
+
+This is a citation [@wang2021bernsteinROC].
+
+# References
+
